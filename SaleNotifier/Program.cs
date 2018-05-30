@@ -45,12 +45,12 @@ namespace SaleNotifier
                 {
                     // Make a REST post to jessica here - 
                     Console.WriteLine( reader[3].ToString(), reader[4].ToString());
-                    Uri endpoint = new Uri("https://jessica-cr.xyz/listings/consignment/sold");
-                    string requeststr = "{\"TGID\":\"" + reader[3].ToString() + "\"}";
+                    Uri endpoint = new Uri("https://jessica-cr.xyz/listings/consignment/sold");  //("https://jessica-cr.xyz/properties");     //("http://f9ffe33f.ngrok.io/listings/consignment/sold"); //
+                    string requeststr = "{\"ticketGroupId\":\"" + reader[3].ToString() + "\"}";
                     GetPOSTResponse(endpoint,requeststr);
                 }
             }
-            else
+            else 
             {
                 Console.WriteLine("No rows found.");
             }
@@ -63,8 +63,9 @@ namespace SaleNotifier
         {
             HttpWebRequest request = (HttpWebRequest)HttpWebRequest.Create(uri);
 
-            request.Method = "POST";
-            request.ContentType = "text/plain;charset=utf-8";
+            request.Method = "POST"; //"GET"; 
+            request.ContentType = "application/json;charset=utf-8";
+            request.Headers.Add("Authorization", "Basic YXBwdXNlcjp5dWROOWJZRkdKdVlRRHBq");
 
             System.Text.UTF8Encoding encoding = new System.Text.UTF8Encoding();
             byte[] bytes = encoding.GetBytes(data);
@@ -83,6 +84,7 @@ namespace SaleNotifier
             catch
             {
                 Console.WriteLine("Post Failed");
+                
             }
 
 

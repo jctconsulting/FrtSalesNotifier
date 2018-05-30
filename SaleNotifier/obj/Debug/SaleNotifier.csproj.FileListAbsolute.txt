@@ -5,3 +5,10 @@ C:\Users\rich\source\repos\SaleNotifier\SaleNotifier\obj\Debug\SaleNotifier.cspr
 C:\Users\rich\source\repos\SaleNotifier\SaleNotifier\obj\Debug\SaleNotifier.csproj.CoreCompileInputs.cache
 C:\Users\rich\source\repos\SaleNotifier\SaleNotifier\obj\Debug\SaleNotifier.exe
 C:\Users\rich\source\repos\SaleNotifier\SaleNotifier\obj\Debug\SaleNotifier.pdb
+C:\Users\rich\Documents\Source\Repos\SalesNofifier\salesnotifier\SaleNotifier\bin\Debug\SaleNotifier.exe.config
+C:\Users\rich\Documents\Source\Repos\SalesNofifier\salesnotifier\SaleNotifier\bin\Debug\SaleNotifier.exe
+C:\Users\rich\Documents\Source\Repos\SalesNofifier\salesnotifier\SaleNotifier\bin\Debug\SaleNotifier.pdb
+C:\Users\rich\Documents\Source\Repos\SalesNofifier\salesnotifier\SaleNotifier\obj\Debug\SaleNotifier.csprojResolveAssemblyReference.cache
+C:\Users\rich\Documents\Source\Repos\SalesNofifier\salesnotifier\SaleNotifier\obj\Debug\SaleNotifier.csproj.CoreCompileInputs.cache
+C:\Users\rich\Documents\Source\Repos\SalesNofifier\salesnotifier\SaleNotifier\obj\Debug\SaleNotifier.exe
+C:\Users\rich\Documents\Source\Repos\SalesNofifier\salesnotifier\SaleNotifier\obj\Debug\SaleNotifier.pdb
