@@ -45,7 +45,7 @@ namespace SaleNotifier
                 {
                     // Make a REST post to jessica here - 
                     Console.WriteLine( reader[3].ToString(), reader[4].ToString());
-                    Uri endpoint = new Uri("https://jessica-cr.xyz/listings/consignment/sold");  //("https://jessica-cr.xyz/properties");     //("http://f9ffe33f.ngrok.io/listings/consignment/sold"); //
+                    Uri endpoint = new Uri("https://jessica-cr.xyz/listings/consignment/sold");  
                     string requeststr = "{\"ticketGroupId\":\"" + reader[3].ToString() + "\"}";
                     GetPOSTResponse(endpoint,requeststr);
                 }
