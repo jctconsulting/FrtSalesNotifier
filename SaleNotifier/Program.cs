@@ -7,12 +7,13 @@ using System.Data;
 using System.Data.SqlClient;
 using System.Net;
 using System.IO;
+using System.Diagnostics;
 
 namespace SaleNotifier
 {
     class Program
     {
-       
+        public static Boolean statusflag;
 
 
 
@@ -34,6 +35,7 @@ namespace SaleNotifier
             SqlCommand command = new SqlCommand();
             command.Connection = connection;
             command.CommandText = sqlstr;
+            
 
 
             connection.Open();
@@ -47,7 +49,19 @@ namespace SaleNotifier
                     Console.WriteLine( reader[3].ToString(), reader[4].ToString());
                     Uri endpoint = new Uri("https://jessica-cr.xyz/listings/consignment/sold");  
                     string requeststr = "{\"ticketGroupId\":\"" + reader[3].ToString() + "\"}";
+                    statusflag = false;
                     GetPOSTResponse(endpoint,requeststr);
+                    if (statusflag){
+                        ProcessStartInfo startInfo = new ProcessStartInfo();
+                        startInfo.CreateNoWindow = true;
+                        startInfo.UseShellExecute = false;
+                        startInfo.FileName = "c:\\microservice\\ConsoleUnbroadcastTG.exe";
+                        startInfo.WindowStyle = ProcessWindowStyle.Hidden;
+                        startInfo.Arguments = reader[3].ToString();
+                        Process.Start(startInfo);
+
+                        
+                    }
                 }
             }
             else 
@@ -80,6 +94,7 @@ namespace SaleNotifier
             try
             {
                 HttpWebResponse response = (HttpWebResponse)request.GetResponse();
+                statusflag = true;
             }
             catch
             {
