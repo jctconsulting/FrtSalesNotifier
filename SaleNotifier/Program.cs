@@ -8,6 +8,8 @@ using System.Data.SqlClient;
 using System.Net;
 using System.IO;
 using System.Diagnostics;
+using System.Runtime.Serialization;
+using Newtonsoft.Json;
 
 namespace SaleNotifier
 {
@@ -48,7 +50,7 @@ namespace SaleNotifier
                     // Make a REST post to jessica here - 
                     Console.WriteLine( reader[3].ToString(), reader[4].ToString());
                     Uri endpoint = new Uri("https://jessica-cr.xyz/listings/consignment/sold");  
-                    string requeststr = "{\"ticketGroupId\":\"" + reader[3].ToString() + "\"}";
+                    string requeststr = "{\"ticketGroupId\":\"" + reader[3].ToString() + "\" ,\"soldQuantity\":" + reader[].ToString() +"}";
                     statusflag = false;
                     GetPOSTResponse(endpoint,requeststr);
                     if (statusflag){
@@ -73,6 +75,13 @@ namespace SaleNotifier
 
         }
 
+        
+        public class statusMessage
+        {
+            public Boolean status { get; set}
+            public string message { get; set} 
+
+        }
         public static void GetPOSTResponse(Uri uri, string data)
         {
             HttpWebRequest request = (HttpWebRequest)HttpWebRequest.Create(uri);
@@ -94,7 +103,18 @@ namespace SaleNotifier
             try
             {
                 HttpWebResponse response = (HttpWebResponse)request.GetResponse();
-                statusflag = true;
+                Stream responseStream = response.GetResponseStream();
+                Encoding encode = System.Text.Encoding.GetEncoding("utf-8");
+                // Pipes the stream to a higher level stream reader with the required encoding format. 
+                StreamReader readStream = new StreamReader(responseStream, encode);
+                var msgstr = readStream.ReadToEnd();              
+                statusMessage msg = JsonConvert.DeserializeObject<statusMessage>(msgstr);
+                
+
+
+
+                statusflag = msg.status;
+                response.Close();
             }
             catch
             {
