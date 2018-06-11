@@ -12,3 +12,4 @@ C:\Users\rich\Documents\Source\Repos\SalesNofifier\salesnotifier\SaleNotifier\ob
 C:\Users\rich\Documents\Source\Repos\SalesNofifier\salesnotifier\SaleNotifier\obj\Debug\SaleNotifier.csproj.CoreCompileInputs.cache
 C:\Users\rich\Documents\Source\Repos\SalesNofifier\salesnotifier\SaleNotifier\obj\Debug\SaleNotifier.exe
 C:\Users\rich\Documents\Source\Repos\SalesNofifier\salesnotifier\SaleNotifier\obj\Debug\SaleNotifier.pdb
+C:\Users\rich\Documents\Source\Repos\SalesNofifier\salesnotifier\SaleNotifier\bin\Debug\Newtonsoft.Json.dll

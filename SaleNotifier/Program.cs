@@ -25,7 +25,8 @@ namespace SaleNotifier
 
 
             // we will want to add a time interval qualifier to invoice date after testing is done
-            string sqlstr = "SELECT invoice.isautoprocessed, invoice.client_broker_id_for_mercury_buyer , invoice.generated_by_pos_api , ticket_group.ticket_group_id, invoice.create_date, invoice.user_office_id, invoice.invoice_id FROM invoice INNER JOIN ticket ON invoice.invoice_id = ticket.invoice_id INNER JOIN ticket_group ON ticket.ticket_group_id = ticket_group.ticket_group_id WHERE(ticket_group.internal_notes LIKE \'%Romans%\')";
+            string sqlstr = "SELECT dbo.ticket_group.ticket_group_id, dbo.invoice.invoice_id, COUNT(*) AS numsold FROM dbo.invoice INNER JOIN dbo.ticket ON dbo.invoice.invoice_id = dbo.ticket.invoice_id INNER JOIN dbo.ticket_group ON dbo.ticket.ticket_group_id = dbo.ticket_group.ticket_group_id WHERE (dbo.ticket_group.internal_notes LIKE \'%Romans%\') GROUP BY dbo.ticket_group.ticket_group_id, dbo.invoice.invoice_id";
+                // "SELECT invoice.isautoprocessed, invoice.client_broker_id_for_mercury_buyer , invoice.generated_by_pos_api , ticket_group.ticket_group_id, invoice.create_date, invoice.user_office_id, invoice.invoice_id FROM invoice INNER JOIN ticket ON invoice.invoice_id = ticket.invoice_id INNER JOIN ticket_group ON ticket.ticket_group_id = ticket_group.ticket_group_id WHERE(ticket_group.internal_notes LIKE \'%Romans%\')";
 
 
             string connectionString = "Data Source=10.10.25.6;Initial Catalog=indux;Persist Security Info=True;User ID=FRT;Password=Dnt721976";
@@ -48,9 +49,9 @@ namespace SaleNotifier
                 while (reader.Read())
                 {
                     // Make a REST post to jessica here - 
-                    Console.WriteLine( reader[3].ToString(), reader[4].ToString());
+                    Console.WriteLine( reader[0].ToString(), reader[1].ToString());
                     Uri endpoint = new Uri("https://jessica-cr.xyz/listings/consignment/sold");  
-                    string requeststr = "{\"ticketGroupId\":\"" + reader[3].ToString() + "\" ,\"soldQuantity\":" + reader[].ToString() +"}";
+                    string requeststr = "{\"ticketGroupId\":\"" + reader[0].ToString() + "\" ,\"soldQuantity\":" + reader[2].ToString() +"}";
                     statusflag = false;
                     GetPOSTResponse(endpoint,requeststr);
                     if (statusflag){
@@ -59,7 +60,7 @@ namespace SaleNotifier
                         startInfo.UseShellExecute = false;
                         startInfo.FileName = "c:\\microservice\\ConsoleUnbroadcastTG.exe";
                         startInfo.WindowStyle = ProcessWindowStyle.Hidden;
-                        startInfo.Arguments = reader[3].ToString();
+                        startInfo.Arguments = reader[0].ToString();
                         Process.Start(startInfo);
 
                         
@@ -76,12 +77,12 @@ namespace SaleNotifier
         }
 
         
-        public class statusMessage
+      /*  public class statusMessage
         {
             public Boolean status { get; set}
             public string message { get; set} 
 
-        }
+        } */
         public static void GetPOSTResponse(Uri uri, string data)
         {
             HttpWebRequest request = (HttpWebRequest)HttpWebRequest.Create(uri);
@@ -104,16 +105,24 @@ namespace SaleNotifier
             {
                 HttpWebResponse response = (HttpWebResponse)request.GetResponse();
                 Stream responseStream = response.GetResponseStream();
-                Encoding encode = System.Text.Encoding.GetEncoding("utf-8");
+
+                //Encoding encode = System.Text.Encoding.GetEncoding("utf-8");
                 // Pipes the stream to a higher level stream reader with the required encoding format. 
-                StreamReader readStream = new StreamReader(responseStream, encode);
-                var msgstr = readStream.ReadToEnd();              
-                statusMessage msg = JsonConvert.DeserializeObject<statusMessage>(msgstr);
+                //StreamReader readStream = new StreamReader(responseStream, encode);
+                //var msgstr = readStream.ReadToEnd();              
+                //statusMessage msg = JsonConvert.DeserializeObject<statusMessage>(msgstr);
                 
+                if (response.StatusCode == HttpStatusCode.OK)
+                {
+                    statusflag = true;
+                }
+                else
+                {
+                    statusflag = false;
+                }
 
 
-
-                statusflag = msg.status;
+              //  statusflag = msg.status;
                 response.Close();
             }
             catch
