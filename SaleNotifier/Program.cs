@@ -23,13 +23,17 @@ namespace SaleNotifier
         static void Main(string[] args)
         {
 
+          //test  -   CreateCatListing("121783");
+
 
             // we will want to add a time interval qualifier to invoice date after testing is done
             string sqlstr = "SELECT dbo.ticket_group.ticket_group_id, dbo.invoice.invoice_id, COUNT(*) AS numsold FROM dbo.invoice INNER JOIN dbo.ticket ON dbo.invoice.invoice_id = dbo.ticket.invoice_id INNER JOIN dbo.ticket_group ON dbo.ticket.ticket_group_id = dbo.ticket_group.ticket_group_id WHERE (dbo.ticket_group.internal_notes LIKE \'%Romans%\') GROUP BY dbo.ticket_group.ticket_group_id, dbo.invoice.invoice_id";
-                // "SELECT invoice.isautoprocessed, invoice.client_broker_id_for_mercury_buyer , invoice.generated_by_pos_api , ticket_group.ticket_group_id, invoice.create_date, invoice.user_office_id, invoice.invoice_id FROM invoice INNER JOIN ticket ON invoice.invoice_id = ticket.invoice_id INNER JOIN ticket_group ON ticket.ticket_group_id = ticket_group.ticket_group_id WHERE(ticket_group.internal_notes LIKE \'%Romans%\')";
+            // "SELECT invoice.isautoprocessed, invoice.client_broker_id_for_mercury_buyer , invoice.generated_by_pos_api , ticket_group.ticket_group_id, invoice.create_date, invoice.user_office_id, invoice.invoice_id FROM invoice INNER JOIN ticket ON invoice.invoice_id = ticket.invoice_id INNER JOIN ticket_group ON ticket.ticket_group_id = ticket_group.ticket_group_id WHERE(ticket_group.internal_notes LIKE \'%Romans%\')";
 
-
-            string connectionString = "Data Source=10.10.25.6;Initial Catalog=indux;Persist Security Info=True;User ID=FRT;Password=Dnt721976";
+            //sandbox
+            string connectionString = "Data Source=10.10.25.143;Initial Catalog=indux;Persist Security Info=True;User ID=sa;Password=Dnt721976";
+           //production
+            // string connectionString = "Data Source=10.10.25.6;Initial Catalog=indux;Persist Security Info=True;User ID=FRT;Password=Dnt721976";
             //string providerName = "System.Data.SqlClient";
 
 
@@ -55,6 +59,9 @@ namespace SaleNotifier
                     statusflag = false;
                     GetPOSTResponse(endpoint,requeststr);
                     if (statusflag){
+
+                        /* *************Removed for testing************
+
                         ProcessStartInfo startInfo = new ProcessStartInfo();
                         startInfo.CreateNoWindow = true;
                         startInfo.UseShellExecute = false;
@@ -62,6 +69,18 @@ namespace SaleNotifier
                         startInfo.WindowStyle = ProcessWindowStyle.Hidden;
                         startInfo.Arguments = reader[0].ToString();
                         Process.Start(startInfo);
+                        */
+
+                        //Create cat even if we aren't reversing inv/po out  
+                        CreateCatListing(reader[0].ToString());
+                        bool tntrans = false;
+                        tntrans = checkTransactionType(Int32.Parse(reader[0].ToString()));
+                        if (!tntrans)
+                        {
+                            int poid = VoidInvoice(Int32.Parse(reader[1].ToString()));
+                            VoidPO(poid);
+                        }
+                     //   NotifyFRT(); none for now - Ari get from jessica 
 
                         
                     }
@@ -95,7 +114,7 @@ namespace SaleNotifier
             byte[] bytes = encoding.GetBytes(data);
 
             request.ContentLength = bytes.Length;
-
+            request.Timeout = 60000;
             using (Stream requestStream = request.GetRequestStream())
             {
                 // Send the data.
@@ -103,16 +122,10 @@ namespace SaleNotifier
             }
             try
             {
-                HttpWebResponse response = (HttpWebResponse)request.GetResponse();
+                HttpWebResponse response= (HttpWebResponse)request.GetResponse();
                 Stream responseStream = response.GetResponseStream();
-
-                //Encoding encode = System.Text.Encoding.GetEncoding("utf-8");
-                // Pipes the stream to a higher level stream reader with the required encoding format. 
-                //StreamReader readStream = new StreamReader(responseStream, encode);
-                //var msgstr = readStream.ReadToEnd();              
-                //statusMessage msg = JsonConvert.DeserializeObject<statusMessage>(msgstr);
-                
-                if (response.StatusCode == HttpStatusCode.OK)
+           
+                if ((response.StatusCode == HttpStatusCode.OK) ||  (response.StatusCode == HttpStatusCode.Accepted))
                 {
                     statusflag = true;
                 }
@@ -131,6 +144,141 @@ namespace SaleNotifier
                 
             }
 
+
+        }
+        public static int VoidInvoice(int invoiceid)
+        {
+            int poid = 0;
+            string invconnectionString = "Data Source=10.10.25.6;Initial Catalog=indux;Persist Security Info=True;User ID=FRT;Password=Dnt721976";
+            SqlConnection invconnection = new SqlConnection(invconnectionString);
+            string invsqlstring = "EXECUTE @RC = [dbo].[pos_invoice_void] " + invoiceid + ",0,0, ,,1"; 
+            SqlCommand catlistCommand = new SqlCommand();
+            catlistCommand.Connection = invconnection;
+            catlistCommand.CommandText = invsqlstring;
+            catlistCommand.ExecuteScalar();
+            invconnection.Close();
+
+            //get invoice id for this sale
+            // what to do if multiple invoices?
+                
+            return poid;
+
+        }
+
+        public static int VoidPO(int poid)
+        {
+
+            // call purchase_oder_void_po
+
+
+            return 0;
+
+        }
+
+        public static int CreateCatListing(string oldtg)
+        {
+            int tgid=0;
+            // GetTGInfo
+
+            string sqlstring =  "Select * from ticket_group where ticket_group_id = " + oldtg;
+            string clconnectionString = "Data Source=10.10.25.6;Initial Catalog=indux;Persist Security Info=True;User ID=FRT;Password=Dnt721976";
+            SqlConnection clconnection = new SqlConnection(clconnectionString);
+            SqlCommand command = new SqlCommand();
+            command.Connection = clconnection;
+            command.CommandText = sqlstring;
+            clconnection.Open();
+            SqlDataReader reader = command.ExecuteReader();
+
+
+            reader.Read();     
+            // get the event info we need
+            SqlCommand eventCommand = new SqlCommand();
+            eventCommand.Connection = clconnection;
+            eventCommand.CommandText = "Select * from event where event_id = " + reader[14].ToString();
+
+            String rowString = reader[9].ToString();
+            String sectionString =   reader[10].ToString();
+            String seathighString = "0"; //reader[22].ToString();
+            String seatlowString = "0"; //reader[23].ToString();
+            String qtyString = reader[4].ToString();
+            String localeventString = reader[14].ToString();
+
+
+            //  clconnection.Open();
+            reader.Close();
+            SqlDataReader eventReader = eventCommand.ExecuteReader();
+
+            eventReader.Read();
+            int exchangeEventId = Int32.Parse(eventReader[12].ToString());
+            string eventName = eventReader[1].ToString();
+            DateTime eventDate = DateTime.Parse(eventReader[2].ToString());
+            DateTime onHand = eventDate.AddDays(-4);
+            int venueId = Int32.Parse(eventReader[7].ToString());
+
+
+
+            //get Venue Info we need
+            SqlCommand venueCommand = new SqlCommand();
+            venueCommand.Connection = clconnection;
+            venueCommand.CommandText = "Select name from venue where venue_id = " + eventReader[7].ToString();
+            //    clconnection.Open();
+            eventReader.Close();
+            SqlDataReader venueReader = venueCommand.ExecuteReader();
+            venueReader.Read();
+            string venueName = venueReader[0].ToString();
+            venueReader.Close();
+            //make CatListing
+           
+            string catsqlstring = "Declare @RC int EXECUTE @RC = [dbo].[api_category_ticket_group_create] " + exchangeEventId + ",\'" + /*eventName +*/ "\','" + eventDate + "\'," + venueId + ",\'" + venueName + "\'," + sectionString + "," + "\'\'" + "," + rowString + "," + "\'\'" + "," + seatlowString + "," + seathighString + "," + qtyString + "," + "0,0,0,0,\'" + onHand  + "\',\'Sale - RC\'," +"\'\'" +"," + "6," + "2," + localeventString;
+
+  
+
+            SqlCommand catlistCommand = new SqlCommand();
+            catlistCommand.Connection = clconnection;
+            catlistCommand.CommandText =catsqlstring;
+            catlistCommand.ExecuteScalar();
+            //clconnection.Open();
+
+
+            // note should indicate this is a sale
+
+            return tgid;
+        }
+
+
+        public static Boolean checkTransactionType(int TGID)
+        {
+            string connectionString = "Data Source=10.10.25.6;Initial Catalog=indux;Persist Security Info=True;User ID=FRT;Password=Dnt721976";
+            SqlConnection connection = new SqlConnection(connectionString);
+            SqlCommand Command = new SqlCommand();
+            Command.Connection = connection;
+
+            string sqlstr = @"SELECT DISTINCT event.event_name, event.event_datetime, venue.name, ticket_group.ticket_group_id, ticket_group.original_ticket_count, ticket_group.remaining_ticket_count, ticket_group.retail_price, ticket_group.face_price, ticket_group.cost, 
+                         ticket_group.wholesale_price, ticket_group.row, ticket_group.section, ticket_group.internal_notes, ticket_group.notes, ticket_group.event_id, ticket_group.status_id, ticket_group.ticket_group_seating_type_id, 
+                         ticket_group.ticket_group_type_id, ticket_group.client_broker_id, ticket_group.client_broker_employee_id, ticket_group.actual_purchase_date, ticket_group.office_id, ticket_group.price_update_datetime, 
+                         ticket_group.last_wholesale_price, ticket_group.update_datetime, invoice.mercury_transaction_id, invoice.invoice_balance_due, invoice.invoice_total, invoice.invoice_total_due
+              FROM invoice INNER JOIN
+                         ticket ON invoice.invoice_id = ticket.invoice_id RIGHT OUTER JOIN
+                         ticket_group INNER JOIN
+                         event ON ticket_group.event_id = event.event_id INNER JOIN
+                         venue ON event.venue_id = venue.venue_id ON ticket.ticket_group_id = ticket_group.ticket_group_id
+              WHERE        (ticket_group.client_broker_id = 5640) AND(ticket_group.internal_notes LIKE 'FRT') and(invoice.external_PO like \'0\') and ticket_group.ticket_group_id =";
+
+            sqlstr = sqlstr + TGID.ToString(); 
+            Command.CommandText = sqlstr;
+            connection.Open();
+            SqlDataReader Reader = Command.ExecuteReader();
+           // string venueName = Reader[0].ToString();
+
+            if (Reader.HasRows)
+            {               
+                //this is a not tnet trans
+                return false;
+            }
+            else
+            {
+                return true;
+            }
 
         }
 
