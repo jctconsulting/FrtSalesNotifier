@@ -10,6 +10,7 @@ using System.IO;
 using System.Diagnostics;
 using System.Runtime.Serialization;
 using Newtonsoft.Json;
+using System.Configuration;
 
 namespace SaleNotifier
 {
@@ -30,8 +31,9 @@ namespace SaleNotifier
             string sqlstr = "SELECT dbo.ticket_group.ticket_group_id, dbo.invoice.invoice_id, COUNT(*) AS numsold FROM dbo.invoice INNER JOIN dbo.ticket ON dbo.invoice.invoice_id = dbo.ticket.invoice_id INNER JOIN dbo.ticket_group ON dbo.ticket.ticket_group_id = dbo.ticket_group.ticket_group_id WHERE (dbo.ticket_group.internal_notes LIKE \'%Romans%\') GROUP BY dbo.ticket_group.ticket_group_id, dbo.invoice.invoice_id";
             // "SELECT invoice.isautoprocessed, invoice.client_broker_id_for_mercury_buyer , invoice.generated_by_pos_api , ticket_group.ticket_group_id, invoice.create_date, invoice.user_office_id, invoice.invoice_id FROM invoice INNER JOIN ticket ON invoice.invoice_id = ticket.invoice_id INNER JOIN ticket_group ON ticket.ticket_group_id = ticket_group.ticket_group_id WHERE(ticket_group.internal_notes LIKE \'%Romans%\')";
 
-            //sandbox
-            string connectionString = "Data Source=10.10.25.143;Initial Catalog=indux;Persist Security Info=True;User ID=sa;Password=Dnt721976";
+            //sandbox - frt-vivdsql
+            string connectionString = ConfigurationManager.ConnectionStrings["indux"].ConnectionString;
+               // "Data Source=10.10.25.144;Initial Catalog=indux;Persist Security Info=True;User ID=sa;Password=Dnt721976";
            //production
             // string connectionString = "Data Source=10.10.25.6;Initial Catalog=indux;Persist Security Info=True;User ID=FRT;Password=Dnt721976";
             //string providerName = "System.Data.SqlClient";
@@ -56,8 +58,8 @@ namespace SaleNotifier
                     Console.WriteLine( reader[0].ToString(), reader[1].ToString());
                     Uri endpoint = new Uri("https://jessica-cr.xyz/listings/consignment/sold");  
                     string requeststr = "{\"ticketGroupId\":\"" + reader[0].ToString() + "\" ,\"soldQuantity\":" + reader[2].ToString() +"}";
-                    statusflag = false;
-                    GetPOSTResponse(endpoint,requeststr);
+                    statusflag = true; //false -production
+                   // GetPOSTResponse(endpoint,requeststr);
                     if (statusflag){
 
                         /* *************Removed for testing************
@@ -149,9 +151,11 @@ namespace SaleNotifier
         public static int VoidInvoice(int invoiceid)
         {
             int poid = 0;
-            string invconnectionString = "Data Source=10.10.25.6;Initial Catalog=indux;Persist Security Info=True;User ID=FRT;Password=Dnt721976";
+            string invconnectionString = ConfigurationManager.ConnectionStrings["indux"].ConnectionString;
+            
             SqlConnection invconnection = new SqlConnection(invconnectionString);
-            string invsqlstring = "EXECUTE @RC = [dbo].[pos_invoice_void] " + invoiceid + ",0,0, ,,1"; 
+            invconnection.Open();
+            string invsqlstring = "DECLARE @RC int EXECUTE @RC = [dbo].[pos_invoice_void] " + invoiceid + ",0,0, ,,1"; 
             SqlCommand catlistCommand = new SqlCommand();
             catlistCommand.Connection = invconnection;
             catlistCommand.CommandText = invsqlstring;
@@ -168,8 +172,15 @@ namespace SaleNotifier
         public static int VoidPO(int poid)
         {
 
-            // call purchase_oder_void_po
-
+            // call purchase_order_void_po
+            
+            string voidString = ConfigurationManager.ConnectionStrings["indux"].ConnectionString;
+            
+            SqlConnection voidCon = new SqlConnection(voidString);
+            voidCon.Open();
+            SqlCommand voidCom = new SqlCommand();
+            voidCom.Connection = voidCon;
+            voidCom.CommandText = "declare @RC int Execute @RC = [dbo].[puchase_order_void_po] " + poid + "1,6"; //tranofficeid,sysuserid
 
             return 0;
 
@@ -181,7 +192,8 @@ namespace SaleNotifier
             // GetTGInfo
 
             string sqlstring =  "Select * from ticket_group where ticket_group_id = " + oldtg;
-            string clconnectionString = "Data Source=10.10.25.6;Initial Catalog=indux;Persist Security Info=True;User ID=FRT;Password=Dnt721976";
+            string clconnectionString = ConfigurationManager.ConnectionStrings["indux"].ConnectionString;
+            
             SqlConnection clconnection = new SqlConnection(clconnectionString);
             SqlCommand command = new SqlCommand();
             command.Connection = clconnection;
@@ -248,7 +260,8 @@ namespace SaleNotifier
 
         public static Boolean checkTransactionType(int TGID)
         {
-            string connectionString = "Data Source=10.10.25.6;Initial Catalog=indux;Persist Security Info=True;User ID=FRT;Password=Dnt721976";
+            string connectionString = ConfigurationManager.ConnectionStrings["indux"].ConnectionString;
+          
             SqlConnection connection = new SqlConnection(connectionString);
             SqlCommand Command = new SqlCommand();
             Command.Connection = connection;
@@ -262,7 +275,7 @@ namespace SaleNotifier
                          ticket_group INNER JOIN
                          event ON ticket_group.event_id = event.event_id INNER JOIN
                          venue ON event.venue_id = venue.venue_id ON ticket.ticket_group_id = ticket_group.ticket_group_id
-              WHERE        (ticket_group.client_broker_id = 5640) AND(ticket_group.internal_notes LIKE 'FRT') and(invoice.external_PO like \'0\') and ticket_group.ticket_group_id =";
+              WHERE        (invoice.mercury_transaction_id is null) and   (invoice.external_PO not like '0') and ticket_group.ticket_group_id =";
 
             sqlstr = sqlstr + TGID.ToString(); 
             Command.CommandText = sqlstr;
