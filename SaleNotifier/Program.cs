@@ -17,18 +17,20 @@ namespace SaleNotifier
     class Program
     {
         public static Boolean statusflag;
-
+        public static String tgidString;
+        public static String poidString;
+        public static String invString;
 
 
 
         static void Main(string[] args)
         {
 
-          //test  -   CreateCatListing("121783");
-
+            //test  -   CreateCatListing("121783");
+            
 
             // we will want to add a time interval qualifier to invoice date after testing is done
-            string sqlstr = "SELECT dbo.ticket_group.ticket_group_id, dbo.invoice.invoice_id, COUNT(*) AS numsold FROM dbo.invoice INNER JOIN dbo.ticket ON dbo.invoice.invoice_id = dbo.ticket.invoice_id INNER JOIN dbo.ticket_group ON dbo.ticket.ticket_group_id = dbo.ticket_group.ticket_group_id WHERE (dbo.ticket_group.internal_notes LIKE \'%Romans%\') GROUP BY dbo.ticket_group.ticket_group_id, dbo.invoice.invoice_id";
+            string sqlstr = "SELECT dbo.ticket_group.ticket_group_id, dbo.invoice.invoice_id, COUNT(*) AS numsold,ticket.purchase_order_id FROM dbo.invoice INNER JOIN dbo.ticket ON dbo.invoice.invoice_id = dbo.ticket.invoice_id INNER JOIN dbo.ticket_group ON dbo.ticket.ticket_group_id = dbo.ticket_group.ticket_group_id WHERE (dbo.ticket_group.internal_notes LIKE \'%Romans%\') GROUP BY dbo.ticket_group.ticket_group_id, dbo.invoice.invoice_id";
             // "SELECT invoice.isautoprocessed, invoice.client_broker_id_for_mercury_buyer , invoice.generated_by_pos_api , ticket_group.ticket_group_id, invoice.create_date, invoice.user_office_id, invoice.invoice_id FROM invoice INNER JOIN ticket ON invoice.invoice_id = ticket.invoice_id INNER JOIN ticket_group ON ticket.ticket_group_id = ticket_group.ticket_group_id WHERE(ticket_group.internal_notes LIKE \'%Romans%\')";
 
             //sandbox - frt-vivdsql
@@ -54,10 +56,16 @@ namespace SaleNotifier
             {
                 while (reader.Read())
                 {
+                    tgidString = reader[0].ToString();
+                    poidString = reader[3].ToString();
+                    invString = reader[1].ToString();
+
+
+
                     // Make a REST post to jessica here - 
                     Console.WriteLine( reader[0].ToString(), reader[1].ToString());
                     Uri endpoint = new Uri("https://jessica-cr.xyz/listings/consignment/sold");  
-                    string requeststr = "{\"ticketGroupId\":\"" + reader[0].ToString() + "\" ,\"soldQuantity\":" + reader[2].ToString() +"}";
+                    string requeststr = "{\"ticketGroupId\":\"" + tgidString + "\" ,\"soldQuantity\":" + reader[2].ToString() +"}";
                     statusflag = true; //false -production
                    // GetPOSTResponse(endpoint,requeststr);
                     if (statusflag){
@@ -74,13 +82,26 @@ namespace SaleNotifier
                         */
 
                         //Create cat even if we aren't reversing inv/po out  
+                        
                         CreateCatListing(reader[0].ToString());
                         bool tntrans = false;
-                        tntrans = checkTransactionType(Int32.Parse(reader[0].ToString()));
+                        tntrans = checkTransactionType(Int32.Parse(tgidString));
                         if (!tntrans)
                         {
-                            int poid = VoidInvoice(Int32.Parse(reader[1].ToString()));
-                            VoidPO(poid);
+                            // Don't void PO if invoice fails to void - creates orphaned invoice
+                            if (VoidInvoice(Int32.Parse(invString))==0)
+                            {
+                                VoidPO(Int32.Parse(poidString));
+                            }
+                            else
+                            {
+                                LogEntry("PO not voided - Invoice void failed", "fail");
+
+                            }
+                        }
+                        else
+                        {
+                            LogEntry("Tnet Transaction - Nothing Voided", "warn");
                         }
                      //   NotifyFRT(); none for now - Ari get from jessica 
 
@@ -98,12 +119,7 @@ namespace SaleNotifier
         }
 
         
-      /*  public class statusMessage
-        {
-            public Boolean status { get; set}
-            public string message { get; set} 
-
-        } */
+      
         public static void GetPOSTResponse(Uri uri, string data)
         {
             HttpWebRequest request = (HttpWebRequest)HttpWebRequest.Create(uri);
@@ -150,22 +166,33 @@ namespace SaleNotifier
         }
         public static int VoidInvoice(int invoiceid)
         {
-            int poid = 0;
-            string invconnectionString = ConfigurationManager.ConnectionStrings["indux"].ConnectionString;
-            
+          
+            string invconnectionString = ConfigurationManager.ConnectionStrings["indux"].ConnectionString;            
             SqlConnection invconnection = new SqlConnection(invconnectionString);
             invconnection.Open();
-            string invsqlstring = "DECLARE @RC int EXECUTE @RC = [dbo].[pos_invoice_void] " + invoiceid + ",0,0, ,,1"; 
+
+            
+
+            string invsqlstring = "DECLARE @RC int EXECUTE @RC = [dbo].[pos_invoice_void] " + invoiceid + ",0,0,0,\'Romans\',1"; 
             SqlCommand catlistCommand = new SqlCommand();
             catlistCommand.Connection = invconnection;
             catlistCommand.CommandText = invsqlstring;
-            catlistCommand.ExecuteScalar();
+            try
+            {
+                catlistCommand.ExecuteScalar();
+            }
+            catch(Exception ex)
+            {
+                LogEntry("Invoice Void Failed:" + ex.Message , "fail");
+                return 1;
+            }
             invconnection.Close();
 
+            LogEntry("Invoice Voided", "success");
             //get invoice id for this sale
             // what to do if multiple invoices?
                 
-            return poid;
+            return 0;
 
         }
 
@@ -181,8 +208,20 @@ namespace SaleNotifier
             SqlCommand voidCom = new SqlCommand();
             voidCom.Connection = voidCon;
             voidCom.CommandText = "declare @RC int Execute @RC = [dbo].[puchase_order_void_po] " + poid + "1,6"; //tranofficeid,sysuserid
+            try
+            {
+                voidCom.ExecuteScalar();                
+                LogEntry("PO Voided", "success");
+                return 0;
+            }
+            catch(Exception ex)
+            {
+                LogEntry("PO not voided:" + ex.Message, "fail");
+                return 1;
+            }
 
-            return 0;
+
+            
 
         }
 
@@ -248,13 +287,24 @@ namespace SaleNotifier
             SqlCommand catlistCommand = new SqlCommand();
             catlistCommand.Connection = clconnection;
             catlistCommand.CommandText =catsqlstring;
-            catlistCommand.ExecuteScalar();
+            try
+            {
+                catlistCommand.ExecuteScalar();
+                LogEntry("Cat LIsting Created ", "success");
+
+                return tgid;
+            }
+            catch (Exception ex){
+
+                LogEntry("Cat LIsting CreatonFailed:" + ex.Message, "fail");
+                return 0;
+            }
             //clconnection.Open();
 
 
             // note should indicate this is a sale
 
-            return tgid;
+            
         }
 
 
@@ -292,6 +342,20 @@ namespace SaleNotifier
             {
                 return true;
             }
+
+        }
+         public static void LogEntry(string message,string status)
+        {
+            string logString = ConfigurationManager.ConnectionStrings["TicketTracker"].ConnectionString;
+            SqlConnection logConnection = new SqlConnection(logString);
+            logConnection.Open();
+            string logQuery = @"INSERT INTO [dbo].[Sales_log]  ([TGID],[POID] ,[InvoiceID],[message] ,[status])
+                                 VALUES " + tgidString + "," + poidString + "," + invString + "," + message + "," + status;
+            SqlCommand logCommand = new SqlCommand();
+            logCommand.Connection = logConnection;
+            logCommand.CommandText = logQuery;
+            logCommand.ExecuteNonQuery();
+            logConnection.Close();
 
         }
 
