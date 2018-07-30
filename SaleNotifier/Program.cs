@@ -20,6 +20,7 @@ namespace SaleNotifier
         public static String tgidString;
         public static String poidString;
         public static String invString;
+        public static String soldString;
 
 
 
@@ -30,15 +31,12 @@ namespace SaleNotifier
             
 
             // we will want to add a time interval qualifier to invoice date after testing is done
-            string sqlstr = "SELECT dbo.ticket_group.ticket_group_id, dbo.invoice.invoice_id, COUNT(*) AS numsold,ticket.purchase_order_id FROM dbo.invoice INNER JOIN dbo.ticket ON dbo.invoice.invoice_id = dbo.ticket.invoice_id INNER JOIN dbo.ticket_group ON dbo.ticket.ticket_group_id = dbo.ticket_group.ticket_group_id WHERE (dbo.ticket_group.internal_notes LIKE \'%Romans%\') GROUP BY dbo.ticket_group.ticket_group_id, dbo.invoice.invoice_id";
+            string sqlstr = "SELECT dbo.ticket_group.ticket_group_id, dbo.invoice.invoice_id, COUNT(*) AS numsold,ticket.purchase_order_id FROM dbo.invoice INNER JOIN dbo.ticket ON dbo.invoice.invoice_id = dbo.ticket.invoice_id INNER JOIN dbo.ticket_group ON dbo.ticket.ticket_group_id = dbo.ticket_group.ticket_group_id WHERE (dbo.ticket_group.internal_notes LIKE \'%Romans%\') GROUP BY dbo.ticket_group.ticket_group_id, dbo.invoice.invoice_id,ticket.purchase_order_id";
             // "SELECT invoice.isautoprocessed, invoice.client_broker_id_for_mercury_buyer , invoice.generated_by_pos_api , ticket_group.ticket_group_id, invoice.create_date, invoice.user_office_id, invoice.invoice_id FROM invoice INNER JOIN ticket ON invoice.invoice_id = ticket.invoice_id INNER JOIN ticket_group ON ticket.ticket_group_id = ticket_group.ticket_group_id WHERE(ticket_group.internal_notes LIKE \'%Romans%\')";
 
             //sandbox - frt-vivdsql
             string connectionString = ConfigurationManager.ConnectionStrings["indux"].ConnectionString;
-               // "Data Source=10.10.25.144;Initial Catalog=indux;Persist Security Info=True;User ID=sa;Password=Dnt721976";
-           //production
-            // string connectionString = "Data Source=10.10.25.6;Initial Catalog=indux;Persist Security Info=True;User ID=FRT;Password=Dnt721976";
-            //string providerName = "System.Data.SqlClient";
+             
 
 
             SqlConnection connection = new SqlConnection(connectionString);
@@ -59,13 +57,13 @@ namespace SaleNotifier
                     tgidString = reader[0].ToString();
                     poidString = reader[3].ToString();
                     invString = reader[1].ToString();
-
+                    soldString = reader[2].ToString();
 
 
                     // Make a REST post to jessica here - 
                     Console.WriteLine( reader[0].ToString(), reader[1].ToString());
                     Uri endpoint = new Uri("https://jessica-cr.xyz/listings/consignment/sold");  
-                    string requeststr = "{\"ticketGroupId\":\"" + tgidString + "\" ,\"soldQuantity\":" + reader[2].ToString() +"}";
+                    string requeststr = "{\"ticketGroupId\":\"" + tgidString + "\" ,\"soldQuantity\":" + soldString +"}";
                     statusflag = true; //false -production
                    // GetPOSTResponse(endpoint,requeststr);
                     if (statusflag){
@@ -103,9 +101,36 @@ namespace SaleNotifier
                         {
                             LogEntry("Tnet Transaction - Nothing Voided", "warn");
                         }
-                     //   NotifyFRT(); none for now - Ari get from jessica 
+                        //   NotifyFRT(); none for now - Ari get from jessica 
+                        string specSalestr = @"SELECT DISTINCT invoice.mercury_transaction_id,invoice.external_PO,ticket_group.client_broker_id,event.event_name, event.event_datetime, venue.name, ticket_group.ticket_group_id,  ticket_group.cost, 
+                         ticket_group.wholesale_price, ticket_group.row, ticket_group.section, ticket_group.internal_notes, ticket_group.notes, ticket_group.last_wholesale_price,  invoice.invoice_balance_due, invoice.invoice_total, ticket_group.actual_purchase_date,invoice.sent_in_update_datetime
+                         FROM invoice INNER JOIN ticket ON invoice.invoice_id = ticket.invoice_id RIGHT OUTER JOIN ticket_group INNER JOIN event ON ticket_group.event_id = event.event_id INNER JOIN
+                         venue ON event.venue_id = venue.venue_id ON ticket.ticket_group_id = ticket_group.ticket_group_id
+			             where      ticket_group.ticket_group_id =" + tgidString;
 
-                        
+                        SqlCommand specsale = new SqlCommand();
+                        SqlConnection srconnection = new SqlConnection(connectionString);
+                        srconnection.Open();
+                        specsale.Connection = srconnection;
+                        specsale.CommandText = specSalestr;
+                        SqlDataReader specReader = specsale.ExecuteReader();
+
+                        string specSaleString = ConfigurationManager.ConnectionStrings["TicketTracker"].ConnectionString;
+                        SqlConnection specSaleConnection = new SqlConnection(specSaleString);
+                        specSaleConnection.Open();
+
+                        string specRecord = @"INSERT INTO [dbo].[SpecSales]
+                                            ([Ticket_group_id],[invoice_id],[purchase_order_id],[Ordernum],[ExternalPO],[EventName],[EventDate],[VenueName],[State],[City],[Quantity],[Section],[Row],[SalePrice],[OrderTotal],[SaleDate])
+                                            VALUES
+                                            (" + tgidString + "," + invString + "," + poidString + "," + specReader[0].ToString() + "," + specReader[1].ToString() + "," + specReader[3].ToString() + "," + specReader[4].ToString() + "," + specReader[5].ToString() + "," + "\'\',\'\'," + soldString + specReader[9].ToString() + "," + specReader[10].ToString() + "," + specReader[8].ToString() + "," + specReader[15].ToString() + "," + specReader[17].ToString() + ")";
+
+                        SqlCommand insSpecRecord = new SqlCommand();
+                        insSpecRecord.Connection = specSaleConnection;
+                        insSpecRecord.CommandText = specRecord;
+                        insSpecRecord.ExecuteNonQuery();
+                        specSaleConnection.Close();
+                        srconnection.Close();
+
                     }
                 }
             }
@@ -184,14 +209,12 @@ namespace SaleNotifier
             catch(Exception ex)
             {
                 LogEntry("Invoice Void Failed:" + ex.Message , "fail");
+                invconnection.Close();
                 return 1;
             }
-            invconnection.Close();
 
+            invconnection.Close();
             LogEntry("Invoice Voided", "success");
-            //get invoice id for this sale
-            // what to do if multiple invoices?
-                
             return 0;
 
         }
@@ -207,11 +230,12 @@ namespace SaleNotifier
             voidCon.Open();
             SqlCommand voidCom = new SqlCommand();
             voidCom.Connection = voidCon;
-            voidCom.CommandText = "declare @RC int Execute @RC = [dbo].[puchase_order_void_po] " + poid + "1,6"; //tranofficeid,sysuserid
+            voidCom.CommandText = "declare @RC int Execute @RC = [dbo].[purchase_order_void_po] " + poid + ",1,6"; //tranofficeid,sysuserid
             try
             {
                 voidCom.ExecuteScalar();                
                 LogEntry("PO Voided", "success");
+                voidCon.Close();
                 return 0;
             }
             catch(Exception ex)
@@ -296,7 +320,7 @@ namespace SaleNotifier
             }
             catch (Exception ex){
 
-                LogEntry("Cat LIsting CreatonFailed:" + ex.Message, "fail");
+                LogEntry("Cat LIsting Creation Failed:" + ex.Message, "fail");
                 return 0;
             }
             //clconnection.Open();
@@ -349,8 +373,8 @@ namespace SaleNotifier
             string logString = ConfigurationManager.ConnectionStrings["TicketTracker"].ConnectionString;
             SqlConnection logConnection = new SqlConnection(logString);
             logConnection.Open();
-            string logQuery = @"INSERT INTO [dbo].[Sales_log]  ([TGID],[POID] ,[InvoiceID],[message] ,[status])
-                                 VALUES " + tgidString + "," + poidString + "," + invString + "," + message + "," + status;
+            string logQuery = @"INSERT INTO [TicketTracker].[dbo].[Sales_log]  ([TGID],[POID] ,[InvoiceID],[message] ,[status])
+                                 VALUES (" + tgidString + "," + poidString + "," + invString + ",\'" + message + "\',\'" + status + "\')";
             SqlCommand logCommand = new SqlCommand();
             logCommand.Connection = logConnection;
             logCommand.CommandText = logQuery;
