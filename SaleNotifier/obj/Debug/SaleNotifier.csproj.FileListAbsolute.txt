@@ -13,3 +13,12 @@ C:\Users\rich\Documents\Source\Repos\SalesNofifier\salesnotifier\SaleNotifier\ob
 C:\Users\rich\Documents\Source\Repos\SalesNofifier\salesnotifier\SaleNotifier\obj\Debug\SaleNotifier.exe
 C:\Users\rich\Documents\Source\Repos\SalesNofifier\salesnotifier\SaleNotifier\obj\Debug\SaleNotifier.pdb
 C:\Users\rich\Documents\Source\Repos\SalesNofifier\salesnotifier\SaleNotifier\bin\Debug\Newtonsoft.Json.dll
+C:\Users\jctco\Documents\Source\Repos\salesnotifier\SaleNotifier\bin\Debug\SaleNotifier.exe.config
+C:\Users\jctco\Documents\Source\Repos\salesnotifier\SaleNotifier\bin\Debug\SaleNotifier.exe
+C:\Users\jctco\Documents\Source\Repos\salesnotifier\SaleNotifier\bin\Debug\SaleNotifier.pdb
+C:\Users\jctco\Documents\Source\Repos\salesnotifier\SaleNotifier\bin\Debug\Newtonsoft.Json.dll
+C:\Users\jctco\Documents\Source\Repos\salesnotifier\SaleNotifier\obj\Debug\SaleNotifier.csprojAssemblyReference.cache
+C:\Users\jctco\Documents\Source\Repos\salesnotifier\SaleNotifier\obj\Debug\SaleNotifier.csproj.CoreCompileInputs.cache
+C:\Users\jctco\Documents\Source\Repos\salesnotifier\SaleNotifier\obj\Debug\SaleNotifier.csproj.CopyComplete
+C:\Users\jctco\Documents\Source\Repos\salesnotifier\SaleNotifier\obj\Debug\SaleNotifier.exe
+C:\Users\jctco\Documents\Source\Repos\salesnotifier\SaleNotifier\obj\Debug\SaleNotifier.pdb

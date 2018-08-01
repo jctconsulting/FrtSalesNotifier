@@ -82,6 +82,7 @@ namespace SaleNotifier
                         //Create cat even if we aren't reversing inv/po out  
                         
                         CreateCatListing(reader[0].ToString());
+                        AddSpecSale();
                         bool tntrans = false;
                         tntrans = checkTransactionType(Int32.Parse(tgidString));
                         if (!tntrans)
@@ -101,35 +102,7 @@ namespace SaleNotifier
                         {
                             LogEntry("Tnet Transaction - Nothing Voided", "warn");
                         }
-                        //   NotifyFRT(); none for now - Ari get from jessica 
-                        string specSalestr = @"SELECT DISTINCT invoice.mercury_transaction_id,invoice.external_PO,ticket_group.client_broker_id,event.event_name, event.event_datetime, venue.name, ticket_group.ticket_group_id,  ticket_group.cost, 
-                         ticket_group.wholesale_price, ticket_group.row, ticket_group.section, ticket_group.internal_notes, ticket_group.notes, ticket_group.last_wholesale_price,  invoice.invoice_balance_due, invoice.invoice_total, ticket_group.actual_purchase_date,invoice.sent_in_update_datetime
-                         FROM invoice INNER JOIN ticket ON invoice.invoice_id = ticket.invoice_id RIGHT OUTER JOIN ticket_group INNER JOIN event ON ticket_group.event_id = event.event_id INNER JOIN
-                         venue ON event.venue_id = venue.venue_id ON ticket.ticket_group_id = ticket_group.ticket_group_id
-			             where      ticket_group.ticket_group_id =" + tgidString;
-
-                        SqlCommand specsale = new SqlCommand();
-                        SqlConnection srconnection = new SqlConnection(connectionString);
-                        srconnection.Open();
-                        specsale.Connection = srconnection;
-                        specsale.CommandText = specSalestr;
-                        SqlDataReader specReader = specsale.ExecuteReader();
-
-                        string specSaleString = ConfigurationManager.ConnectionStrings["TicketTracker"].ConnectionString;
-                        SqlConnection specSaleConnection = new SqlConnection(specSaleString);
-                        specSaleConnection.Open();
-
-                        string specRecord = @"INSERT INTO [dbo].[SpecSales]
-                                            ([Ticket_group_id],[invoice_id],[purchase_order_id],[Ordernum],[ExternalPO],[EventName],[EventDate],[VenueName],[State],[City],[Quantity],[Section],[Row],[SalePrice],[OrderTotal],[SaleDate])
-                                            VALUES
-                                            (" + tgidString + "," + invString + "," + poidString + "," + specReader[0].ToString() + "," + specReader[1].ToString() + "," + specReader[3].ToString() + "," + specReader[4].ToString() + "," + specReader[5].ToString() + "," + "\'\',\'\'," + soldString + specReader[9].ToString() + "," + specReader[10].ToString() + "," + specReader[8].ToString() + "," + specReader[15].ToString() + "," + specReader[17].ToString() + ")";
-
-                        SqlCommand insSpecRecord = new SqlCommand();
-                        insSpecRecord.Connection = specSaleConnection;
-                        insSpecRecord.CommandText = specRecord;
-                        insSpecRecord.ExecuteNonQuery();
-                        specSaleConnection.Close();
-                        srconnection.Close();
+                       
 
                     }
                 }
@@ -383,7 +356,39 @@ namespace SaleNotifier
 
         }
 
+        public static void AddSpecSale()
+        {
+            //   NotifyFRT(); none for now - Ari get from jessica 
+            string specSalestr = @"SELECT DISTINCT invoice.mercury_transaction_id,invoice.external_PO,ticket_group.client_broker_id,event.event_name, event.event_datetime, venue.name, ticket_group.ticket_group_id,  ticket_group.cost, 
+                         ticket_group.wholesale_price, ticket_group.row, ticket_group.section, ticket_group.internal_notes, ticket_group.notes, ticket_group.last_wholesale_price,  invoice.invoice_balance_due, invoice.invoice_total, ticket_group.actual_purchase_date,invoice.sent_in_update_datetime
+                         FROM invoice INNER JOIN ticket ON invoice.invoice_id = ticket.invoice_id RIGHT OUTER JOIN ticket_group INNER JOIN event ON ticket_group.event_id = event.event_id INNER JOIN
+                         venue ON event.venue_id = venue.venue_id ON ticket.ticket_group_id = ticket_group.ticket_group_id
+			             where      ticket_group.ticket_group_id =" + tgidString;
 
+            SqlCommand specsale = new SqlCommand();
+            SqlConnection srconnection = new SqlConnection(ConfigurationManager.ConnectionStrings["Indux"].ConnectionString);
+            srconnection.Open();
+            specsale.Connection = srconnection;
+            specsale.CommandText = specSalestr;
+            SqlDataReader specReader = specsale.ExecuteReader();
+
+            string specSaleString = ConfigurationManager.ConnectionStrings["TicketTracker"].ConnectionString;
+            SqlConnection specSaleConnection = new SqlConnection(specSaleString);
+            specSaleConnection.Open();
+
+            specReader.Read();
+            string specRecord = @"INSERT INTO [dbo].[SpecSales]
+                                            ([Ticket_group_id],[invoice_id],[purchase_order_id],[Ordernum],[ExternalPO],[EventName],[EventDate],[VenueName],[State],[City],[Quantity],[Section],[Row],[SalePrice],[OrderTotal],[SaleDate])
+                                            VALUES
+                                            (" + tgidString + "," + invString + "," + poidString + ",\'" +specReader[0].ToString() +  "\',\'" +  specReader[1].ToString() + "\',\'" + specReader[3].ToString() + "\',\'" + specReader[4].ToString() + "\',\'" + specReader[5].ToString() + "\',\'" + "\',\'\',\'"  + soldString +"\',\'" + specReader[10].ToString() + "\',\'" + specReader[9].ToString() + "\',\'" + specReader[8].ToString() + "\',\'" + specReader[15].ToString() + "\',\'" + specReader[17].ToString() + "\')";
+
+            SqlCommand insSpecRecord = new SqlCommand();
+            insSpecRecord.Connection = specSaleConnection;
+            insSpecRecord.CommandText = specRecord;
+            insSpecRecord.ExecuteNonQuery();
+            specSaleConnection.Close();
+            srconnection.Close();
+        }
 
 
     }
