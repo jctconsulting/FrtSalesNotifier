@@ -64,11 +64,11 @@ namespace SaleNotifier
                     Console.WriteLine( reader[0].ToString(), reader[1].ToString());
                     Uri endpoint = new Uri("https://jessica-cr.xyz/listings/consignment/sold");  
                     string requeststr = "{\"ticketGroupId\":\"" + tgidString + "\" ,\"soldQuantity\":" + soldString +"}";
-                    statusflag = true; //false -production
-                   // GetPOSTResponse(endpoint,requeststr);
+                    statusflag = false; //false -production
+                    GetPOSTResponse(endpoint,requeststr);
                     if (statusflag){
 
-                        /* *************Removed for testing************
+                        
 
                         ProcessStartInfo startInfo = new ProcessStartInfo();
                         startInfo.CreateNoWindow = true;
@@ -77,10 +77,11 @@ namespace SaleNotifier
                         startInfo.WindowStyle = ProcessWindowStyle.Hidden;
                         startInfo.Arguments = reader[0].ToString();
                         Process.Start(startInfo);
+                        /* *************Removed for testing************
                         */
 
                         //Create cat even if we aren't reversing inv/po out  
-                        
+
                         CreateCatListing(reader[0].ToString());
                         AddSpecSale();
                         bool tntrans = false;
@@ -103,6 +104,11 @@ namespace SaleNotifier
                             LogEntry("Tnet Transaction - Nothing Voided", "warn");
                         }
                        
+
+                    }
+                    else
+                    {
+                        LogEntry("Jessica did not Accept", "fail");
 
                     }
                 }
