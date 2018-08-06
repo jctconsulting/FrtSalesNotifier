@@ -31,7 +31,7 @@ namespace SaleNotifier
             
 
             // we will want to add a time interval qualifier to invoice date after testing is done
-            string sqlstr = "SELECT dbo.ticket_group.ticket_group_id, dbo.invoice.invoice_id, COUNT(*) AS numsold,ticket.purchase_order_id FROM dbo.invoice INNER JOIN dbo.ticket ON dbo.invoice.invoice_id = dbo.ticket.invoice_id INNER JOIN dbo.ticket_group ON dbo.ticket.ticket_group_id = dbo.ticket_group.ticket_group_id WHERE (dbo.ticket_group.internal_notes LIKE \'%Romans%\') GROUP BY dbo.ticket_group.ticket_group_id, dbo.invoice.invoice_id,ticket.purchase_order_id";
+            string sqlstr = "SELECT dbo.ticket_group.ticket_group_id, dbo.invoice.invoice_id, COUNT(*) AS numsold,ticket.purchase_order_id FROM dbo.invoice INNER JOIN dbo.ticket ON dbo.invoice.invoice_id = dbo.ticket.invoice_id INNER JOIN dbo.ticket_group ON dbo.ticket.ticket_group_id = dbo.ticket_group.ticket_group_id WHERE (dbo.ticket_group.internal_notes LIKE \'%Romans%\') or (dbo.ticket_group.internal_notes LIKE \'FRT-Unbroadcast%\') GROUP BY dbo.ticket_group.ticket_group_id, dbo.invoice.invoice_id,ticket.purchase_order_id";
             // "SELECT invoice.isautoprocessed, invoice.client_broker_id_for_mercury_buyer , invoice.generated_by_pos_api , ticket_group.ticket_group_id, invoice.create_date, invoice.user_office_id, invoice.invoice_id FROM invoice INNER JOIN ticket ON invoice.invoice_id = ticket.invoice_id INNER JOIN ticket_group ON ticket.ticket_group_id = ticket_group.ticket_group_id WHERE(ticket_group.internal_notes LIKE \'%Romans%\')";
 
             //sandbox - frt-vivdsql
@@ -68,22 +68,37 @@ namespace SaleNotifier
                     GetPOSTResponse(endpoint,requeststr);
                     if (statusflag){
 
-                        
 
-                        ProcessStartInfo startInfo = new ProcessStartInfo();
-                        startInfo.CreateNoWindow = true;
-                        startInfo.UseShellExecute = false;
-                        startInfo.FileName = "c:\\microservice\\ConsoleUnbroadcastTG.exe";
-                        startInfo.WindowStyle = ProcessWindowStyle.Hidden;
-                        startInfo.Arguments = reader[0].ToString();
-                        Process.Start(startInfo);
                         /* *************Removed for testing************
-                        */
+                                                ProcessStartInfo startInfo = new ProcessStartInfo();
+                                                startInfo.CreateNoWindow = true;
+                                                startInfo.UseShellExecute = false;
+                                                startInfo.FileName = "c:\\microservice\\ConsoleUnbroadcastTG.exe";
+                                                startInfo.WindowStyle = ProcessWindowStyle.Hidden;
+                                                startInfo.Arguments = reader[0].ToString();
+                                                Process.Start(startInfo);
 
-                        //Create cat even if we aren't reversing inv/po out  
+                                                */
 
-                        CreateCatListing(reader[0].ToString());
-                        AddSpecSale();
+                        // check for previous log of this sale - primary key vio otherwise  
+                        string specSaleString = ConfigurationManager.ConnectionStrings["TicketTracker"].ConnectionString;
+                        SqlConnection specSaleConnection = new SqlConnection(specSaleString);
+                        specSaleConnection.Open();
+                        SqlCommand saleCommand = new SqlCommand();
+                        saleCommand.Connection = specSaleConnection;
+                        saleCommand.CommandText = "Select * from SpecSales where ticket_group_id = " + tgidString;
+                        SqlDataReader saleReader = saleCommand.ExecuteReader();
+                        saleReader.Read();
+                        
+                        if (!saleReader.HasRows)
+                        {
+                            AddSpecSale();
+                            //Create cat even if we aren't reversing inv/po out - but don't do listing has already been processed
+                            CreateCatListing(reader[0].ToString());
+                        }
+                        specSaleConnection.Close();
+                        
+                        
                         bool tntrans = false;
                         tntrans = checkTransactionType(Int32.Parse(tgidString));
                         if (!tntrans)
@@ -101,6 +116,7 @@ namespace SaleNotifier
                         }
                         else
                         {
+
                             LogEntry("Tnet Transaction - Nothing Voided", "warn");
                         }
                        
@@ -116,8 +132,10 @@ namespace SaleNotifier
             else 
             {
                 Console.WriteLine("No rows found.");
+                Environment.Exit(1);
             }
             reader.Close();
+            Environment.Exit(0);
 
 
         }
@@ -280,10 +298,12 @@ namespace SaleNotifier
             SqlDataReader venueReader = venueCommand.ExecuteReader();
             venueReader.Read();
             string venueName = venueReader[0].ToString();
+            // account for ' in venue name
+            venueName = venueName.Replace("'", "''");
             venueReader.Close();
             //make CatListing
-           
-            string catsqlstring = "Declare @RC int EXECUTE @RC = [dbo].[api_category_ticket_group_create] " + exchangeEventId + ",\'" + /*eventName +*/ "\','" + eventDate + "\'," + venueId + ",\'" + venueName + "\'," + sectionString + "," + "\'\'" + "," + rowString + "," + "\'\'" + "," + seatlowString + "," + seathighString + "," + qtyString + "," + "0,0,0,0,\'" + onHand  + "\',\'Sale - RC\'," +"\'\'" +"," + "6," + "2," + localeventString;
+          
+            string catsqlstring = "Declare @RC int EXECUTE @RC = [dbo].[api_category_ticket_group_create] " + exchangeEventId + ",\'" + /*eventName +*/ "\','" + eventDate + "\'," + venueId + ",\'" + venueName + "\',\'" + sectionString + "\',\'\',\'" + rowString + "\'," + "\'\'" + "," + seatlowString + "," + seathighString + "," + qtyString + "," + "0,0,0,0,\'" + onHand  + "\',\'Sale - RC\'," +"\'\'" +"," + "6," + "2," + localeventString;
 
   
 
@@ -292,10 +312,15 @@ namespace SaleNotifier
             catlistCommand.CommandText =catsqlstring;
             try
             {
-                catlistCommand.ExecuteScalar();
-                LogEntry("Cat LIsting Created ", "success");
+                SqlDataReader catListingReader;
+                catListingReader=  catlistCommand.ExecuteReader();
+                catListingReader.Read();
+                string result = catListingReader[0].ToString();
+                string catTgid = catListingReader[2].ToString();
+          
+                LogEntry("Cat LIsting Created: " + catTgid, "success");
 
-                return tgid;
+                return Int32.Parse(catTgid);
             }
             catch (Exception ex){
 
@@ -364,6 +389,9 @@ namespace SaleNotifier
 
         public static void AddSpecSale()
         {
+
+            //check for previos log of this tg
+
             //   NotifyFRT(); none for now - Ari get from jessica 
             string specSalestr = @"SELECT DISTINCT invoice.mercury_transaction_id,invoice.external_PO,ticket_group.client_broker_id,event.event_name, event.event_datetime, venue.name, ticket_group.ticket_group_id,  ticket_group.cost, 
                          ticket_group.wholesale_price, ticket_group.row, ticket_group.section, ticket_group.internal_notes, ticket_group.notes, ticket_group.last_wholesale_price,  invoice.invoice_balance_due, invoice.invoice_total, ticket_group.actual_purchase_date,invoice.sent_in_update_datetime
@@ -381,12 +409,19 @@ namespace SaleNotifier
             string specSaleString = ConfigurationManager.ConnectionStrings["TicketTracker"].ConnectionString;
             SqlConnection specSaleConnection = new SqlConnection(specSaleString);
             specSaleConnection.Open();
-
             specReader.Read();
+            string eventString = specReader[3].ToString();
+            eventString = eventString.Replace("'", "''");
+
+            string venueString = specReader[5].ToString();
+            venueString = venueString.Replace("'", "''");
+
+
+
             string specRecord = @"INSERT INTO [dbo].[SpecSales]
                                             ([Ticket_group_id],[invoice_id],[purchase_order_id],[Ordernum],[ExternalPO],[EventName],[EventDate],[VenueName],[State],[City],[Quantity],[Section],[Row],[SalePrice],[OrderTotal],[SaleDate])
                                             VALUES
-                                            (" + tgidString + "," + invString + "," + poidString + ",\'" +specReader[0].ToString() +  "\',\'" +  specReader[1].ToString() + "\',\'" + specReader[3].ToString() + "\',\'" + specReader[4].ToString() + "\',\'" + specReader[5].ToString() + "\',\'" + "\',\'\',\'"  + soldString +"\',\'" + specReader[10].ToString() + "\',\'" + specReader[9].ToString() + "\',\'" + specReader[8].ToString() + "\',\'" + specReader[15].ToString() + "\',\'" + specReader[17].ToString() + "\')";
+                                            (" + tgidString + "," + invString + "," + poidString + ",\'" +specReader[0].ToString() +  "\',\'" +  specReader[1].ToString() + "\',\'" + eventString + "\',\'" + specReader[4].ToString() + "\',\'" + venueString + "\',\'" + "\',\'\',\'"  + soldString +"\',\'" + specReader[10].ToString() + "\',\'" + specReader[9].ToString() + "\',\'" + specReader[8].ToString() + "\',\'" + specReader[15].ToString() + "\',\'" + specReader[17].ToString() + "\')";
 
             SqlCommand insSpecRecord = new SqlCommand();
             insSpecRecord.Connection = specSaleConnection;
