@@ -340,10 +340,10 @@ namespace SaleNotifier
                     SqlCommand vcInsert = new SqlCommand();
                     vcInsert.Connection = clconnection;
                     vcInsert.CommandText = vcInsertstr;
-                    vcInsert.Parameters["section_low"].Value = sectionString;
-                    vcInsert.Parameters["row_low"].Value = rowString;
-                    vcInsert.Parameters["row_high"].Value = rowString;
-                    vcInsert.Parameters["venue_id"].Value = venueId;
+                    vcInsert.Parameters["@section_low"].Value = sectionString;
+                    vcInsert.Parameters["@row_low"].Value = rowString;
+                    vcInsert.Parameters["@row_high"].Value = rowString;
+                    vcInsert.Parameters["@venue_id"].Value = venueId;
                     vcInsert.ExecuteScalar();
 
                     //Make sure vconfig was inserted and get its id
@@ -363,10 +363,10 @@ namespace SaleNotifier
                                                   VALUES(@local_event_id, @venue_category_id, @quantity, 0, 0, \'\', @expected_arrival_date, 0, 0, \'Sale-RC\', 0, CURRENT_TIMESTAMP, 1, CURRENT_TIMESTAMP
                                                   , 1, NULL, 0, 6, 2, NULL, 0, 1, NULL, NULL)";
 
-                        directCat.Parameters["local_event_id"].Value = localeventString;
-                        directCat.Parameters["venue_category_id"].Value =vcReader[0].ToString() ;
-                        directCat.Parameters["quantity"].Value = qtyString;
-                        directCat.Parameters["expected_arrival_date"].Value = onHand;
+                        directCat.Parameters["@local_event_id"].Value = localeventString;
+                        directCat.Parameters["@venue_category_id"].Value =vcReader[0].ToString() ;
+                        directCat.Parameters["@quantity"].Value = qtyString;
+                        directCat.Parameters["@expected_arrival_date"].Value = onHand;
                         catTgid = directCat.ExecuteScalar().ToString();
 
                     }
