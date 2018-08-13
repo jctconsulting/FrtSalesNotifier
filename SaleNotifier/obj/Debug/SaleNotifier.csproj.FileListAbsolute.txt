@@ -22,3 +22,5 @@ C:\Users\jctco\Documents\Source\Repos\salesnotifier\SaleNotifier\obj\Debug\SaleN
 C:\Users\jctco\Documents\Source\Repos\salesnotifier\SaleNotifier\obj\Debug\SaleNotifier.csproj.CopyComplete
 C:\Users\jctco\Documents\Source\Repos\salesnotifier\SaleNotifier\obj\Debug\SaleNotifier.exe
 C:\Users\jctco\Documents\Source\Repos\salesnotifier\SaleNotifier\obj\Debug\SaleNotifier.pdb
+C:\Users\rich\Documents\Source\Repos\SalesNofifier\salesnotifier\SaleNotifier\obj\Debug\SaleNotifier.SQLStrings.resources
+C:\Users\rich\Documents\Source\Repos\SalesNofifier\salesnotifier\SaleNotifier\obj\Debug\SaleNotifier.csproj.GenerateResource.Cache

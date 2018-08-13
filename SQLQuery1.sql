@@ -1,5 +1,8 @@
-SELECT DISTINCT invoice.mercury_transaction_id,invoice.external_PO,ticket_group.client_broker_id,event.event_name, event.event_datetime, venue.name, ticket_group.ticket_group_id,  ticket_group.cost, 
-                         ticket_group.wholesale_price, ticket_group.row, ticket_group.section, ticket_group.internal_notes, ticket_group.notes, ticket_group.last_wholesale_price,  invoice.invoice_balance_due, invoice.invoice_total, ticket_group.actual_purchase_date,invoice.sent_in_update_datetime
-                         FROM invoice INNER JOIN ticket ON invoice.invoice_id = ticket.invoice_id RIGHT OUTER JOIN ticket_group INNER JOIN event ON ticket_group.event_id = event.event_id INNER JOIN
-                         venue ON event.venue_id = venue.venue_id ON ticket.ticket_group_id = ticket_group.ticket_group_id
-			             where      ticket_group.ticket_group_id =123458
+INSERT category_ticket_group(event_id, venue_category_id, ticket_count, wholesale_price, retail_price, notes, expected_arrival_date, face_price, cost, internal_notes, tax_exempt, update_datetime, broadcast, create_date, office_id
+		   , ticket_group_code_id, unbroadcast_days_before_event, shipping_method_special_id, show_near_term_option_id, price_update_datetime, tg_note_grandfathered, auto_process_web_requests, venue_configuration_zone_id, max_showing)
+	OUTPUT INSERTED.category_ticket_group_id
+	
+	VALUES ( @local_event_id, @venue_category_id, @quantity, @wholesale_price, @retail_price , @external_tg_notes, @expected_arrival_date, @face_price, @ticket_cost , @internal_tg_notes, 0, CURRENT_TIMESTAMP, 1, CURRENT_TIMESTAMP
+		    , 1, NULL , 0, @shipping_method_special_id, @near_term_display_option_id, NULL, 0, 1, NULL, NULL)
+			
+			

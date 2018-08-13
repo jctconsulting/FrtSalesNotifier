@@ -1,4 +1,2 @@
-INSERT INTO [dbo].[SpecSales]
-                                            ([Ticket_group_id],[invoice_id],[purchase_order_id],[Ordernum],[ExternalPO],[EventName],[EventDate],[VenueName],[State],[City],[Quantity],[Section],[Row],[SalePrice],[OrderTotal],[SaleDate])
-                                            VALUES
-                                            (123472,85175,83449,'','n/a','The Harlem Globetrotters','8/11/2018 6:00:00 PM','Talking Stick Resort Arena','','','2','111','29','1.0000','2.0000','7/25/2018 11:45:53 AM')
+INSERT dbo.venue_category	  (section_high , section_low, row_low , row_high, seat_low, seat_high, default_wholesale_price, default_retail_price, venue_id, default_cost, default_face_price, text_desc, show_to_sales_staff, default_ticket_group_notes, ticket_group_stock_type_id, ticket_group_type_id, venue_configuration_zone_id)
+VALUES ( '' , @section_low, @row_low, @row_high, '', '', 0.00, 0.00, @venue_id, 0.00, 0.00, '', 1, '', 1, 1, NULL );

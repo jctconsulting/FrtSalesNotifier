@@ -58,6 +58,17 @@ namespace SaleNotifier
                     poidString = reader[3].ToString();
                     invString = reader[1].ToString();
                     soldString = reader[2].ToString();
+                    // check to see if we have notified before
+                    string specSaleString = ConfigurationManager.ConnectionStrings["TicketTracker"].ConnectionString;
+                    SqlConnection specSaleConnection = new SqlConnection(specSaleString);
+                    specSaleConnection.Open();
+                    SqlCommand saleCommand = new SqlCommand();
+                    saleCommand.Connection = specSaleConnection;
+                    saleCommand.CommandText = "Select * from SpecSales where ticket_group_id = " + tgidString;
+                    SqlDataReader saleReader = saleCommand.ExecuteReader();
+                    saleReader.Read();
+                    Boolean notified = saleReader.HasRows;
+                   
 
 
                     // Make a REST post to jessica here - 
@@ -65,22 +76,25 @@ namespace SaleNotifier
                     Uri endpoint = new Uri("https://jessica-cr.xyz/listings/consignment/sold");  
                     string requeststr = "{\"ticketGroupId\":\"" + tgidString + "\" ,\"soldQuantity\":" + soldString +"}";
                     statusflag = false; //false -production
-                    GetPOSTResponse(endpoint,requeststr);
+                    if (!notified)
+                    {
+                        GetPOSTResponse(endpoint, requeststr);
+                    }
+                    
                     if (statusflag){
 
 
-                        /* *************Removed for testing************
-                                                ProcessStartInfo startInfo = new ProcessStartInfo();
-                                                startInfo.CreateNoWindow = true;
-                                                startInfo.UseShellExecute = false;
-                                                startInfo.FileName = "c:\\microservice\\ConsoleUnbroadcastTG.exe";
-                                                startInfo.WindowStyle = ProcessWindowStyle.Hidden;
-                                                startInfo.Arguments = reader[0].ToString();
-                                                Process.Start(startInfo);
+                        // *************Removed for testing************
+                        ProcessStartInfo startInfo = new ProcessStartInfo();
+                        startInfo.CreateNoWindow = true;
+                        startInfo.UseShellExecute = false;
+                        startInfo.FileName = "c:\\microservice\\ConsoleUnbroadcastTG.exe";
+                        startInfo.WindowStyle = ProcessWindowStyle.Hidden;
+                        startInfo.Arguments = reader[0].ToString();
+                        Process.Start(startInfo);
+                        
 
-                                                */
-
-                        // check for previous log of this sale - primary key vio otherwise  
+                        /* check for previous log of this sale - primary key vio otherwise  
                         string specSaleString = ConfigurationManager.ConnectionStrings["TicketTracker"].ConnectionString;
                         SqlConnection specSaleConnection = new SqlConnection(specSaleString);
                         specSaleConnection.Open();
@@ -89,8 +103,9 @@ namespace SaleNotifier
                         saleCommand.CommandText = "Select * from SpecSales where ticket_group_id = " + tgidString;
                         SqlDataReader saleReader = saleCommand.ExecuteReader();
                         saleReader.Read();
+                        */
                         
-                        if (!saleReader.HasRows)
+                        if (!notified)
                         {
                             AddSpecSale();
                             //Create cat even if we aren't reversing inv/po out - but don't do listing has already been processed
@@ -317,6 +332,46 @@ namespace SaleNotifier
                 catListingReader.Read();
                 string result = catListingReader[0].ToString();
                 string catTgid = catListingReader[2].ToString();
+                if (catTgid == "-1") //api function call failed - zoned event likely -> force it
+                {
+                    string vcInsertstr = @"INSERT dbo.venue_category (section_high , section_low, row_low , row_high, seat_low, seat_high, default_wholesale_price, default_retail_price, venue_id, default_cost, default_face_price, text_desc, show_to_sales_staff, default_ticket_group_notes, ticket_group_stock_type_id, ticket_group_type_id, venue_configuration_zone_id)
+                                           VALUES ( '' , @section_low, @row_low, @row_high, '', '', 0.00, 0.00, @venue_id, 0.00, 0.00, '', 1, '', 1, 1, NULL );";
+
+                    SqlCommand vcInsert = new SqlCommand();
+                    vcInsert.Connection = clconnection;
+                    vcInsert.CommandText = vcInsertstr;
+                    vcInsert.Parameters["section_low"].Value = sectionString;
+                    vcInsert.Parameters["row_low"].Value = rowString;
+                    vcInsert.Parameters["row_high"].Value = rowString;
+                    vcInsert.Parameters["venue_id"].Value = venueId;
+                    vcInsert.ExecuteScalar();
+
+                    //Make sure vconfig was inserted and get its id
+                    SqlCommand vcCheck = new SqlCommand();
+                    vcCheck.Connection = clconnection;
+                    vcCheck.CommandText = "SELECT * FROM dbo.venue_category vc	WHERE vc.venue_id = " + eventReader[7].ToString() + " AND vc.row_high =" +rowString + " AND vc.row_low = " + rowString+  " AND vc.section_low = " + sectionString ;
+                    SqlDataReader vcReader = vcCheck.ExecuteReader();
+                    vcReader.Read();
+                    if (vcReader.HasRows)
+                    {
+                        // add catlisting directly
+                        SqlCommand directCat = new SqlCommand();
+                        directCat.Connection = clconnection;
+                        directCat.CommandText = @"INSERT category_ticket_group(event_id, venue_category_id, ticket_count, wholesale_price, retail_price, notes, expected_arrival_date, face_price, cost, internal_notes, tax_exempt, update_datetime, broadcast, create_date, office_id
+		                                          , ticket_group_code_id, unbroadcast_days_before_event, shipping_method_special_id, show_near_term_option_id, price_update_datetime, tg_note_grandfathered, auto_process_web_requests, venue_configuration_zone_id, max_showing)
+	                                              OUTPUT INSERTED.category_ticket_group_id
+                                                  VALUES(@local_event_id, @venue_category_id, @quantity, 0, 0, \'\', @expected_arrival_date, 0, 0, \'Sale-RC\', 0, CURRENT_TIMESTAMP, 1, CURRENT_TIMESTAMP
+                                                  , 1, NULL, 0, 6, 2, NULL, 0, 1, NULL, NULL)";
+
+                        directCat.Parameters["local_event_id"].Value = localeventString;
+                        directCat.Parameters["venue_category_id"].Value =vcReader[0].ToString() ;
+                        directCat.Parameters["quantity"].Value = qtyString;
+                        directCat.Parameters["expected_arrival_date"].Value = onHand;
+                        catTgid = directCat.ExecuteScalar().ToString();
+
+                    }
+
+                } 
           
                 LogEntry("Cat LIsting Created: " + catTgid, "success");
 
