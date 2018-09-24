@@ -69,7 +69,7 @@ namespace SaleNotifier
                     saleReader.Read();
                     Boolean notified = saleReader.HasRows;
                    
-
+                   
 
                     // Make a REST post to jessica here - 
                     Console.WriteLine( reader[0].ToString(), reader[1].ToString());
@@ -334,41 +334,107 @@ namespace SaleNotifier
                 string catTgid = catListingReader[2].ToString();
                 if (catTgid == "-1") //api function call failed - zoned event likely -> force it
                 {
-                    string vcInsertstr = @"INSERT dbo.venue_category (section_high , section_low, row_low , row_high, seat_low, seat_high, default_wholesale_price, default_retail_price, venue_id, default_cost, default_face_price, text_desc, show_to_sales_staff, default_ticket_group_notes, ticket_group_stock_type_id, ticket_group_type_id, venue_configuration_zone_id)
+                    string vcInsertstr = @" INSERT dbo.venue_category (section_high , section_low, row_low , row_high, seat_low, seat_high, default_wholesale_price, default_retail_price, venue_id, default_cost, default_face_price, text_desc, show_to_sales_staff, default_ticket_group_notes, ticket_group_stock_type_id, ticket_group_type_id, venue_configuration_zone_id)
                                            VALUES ( '' , @section_low, @row_low, @row_high, '', '', 0.00, 0.00, @venue_id, 0.00, 0.00, '', 1, '', 1, 1, NULL );";
 
                     SqlCommand vcInsert = new SqlCommand();
-                    vcInsert.Connection = clconnection;
-                    vcInsert.CommandText = vcInsertstr;
-                    vcInsert.Parameters["@section_low"].Value = sectionString;
-                    vcInsert.Parameters["@row_low"].Value = rowString;
-                    vcInsert.Parameters["@row_high"].Value = rowString;
-                    vcInsert.Parameters["@venue_id"].Value = venueId;
-                    vcInsert.ExecuteScalar();
+                    SqlConnection vcCon = new SqlConnection(ConfigurationManager.ConnectionStrings["indux"].ConnectionString);
+                    vcCon.Open();
+                    vcInsert.Connection =vcCon ; // clconnection;
 
+                    vcInsert.CommandText = vcInsertstr;
+             //       vcInsert.CommandType = System.Data.CommandType.StoredProcedure;
+
+                    SqlParameter section = new SqlParameter();
+                    section.ParameterName = "@section_low";
+                    section.Value = sectionString;
+                    vcInsert.Parameters.Add(section);
+
+                    SqlParameter rowhigh = new SqlParameter();
+                    rowhigh.ParameterName = "@row_high";
+                    rowhigh.Value = rowString;
+                    vcInsert.Parameters.Add(rowhigh);
+
+                    SqlParameter rowlow = new SqlParameter();
+                    rowlow.ParameterName = "@row_low";
+                    rowlow.Value = rowString;
+                    vcInsert.Parameters.Add(rowlow);
+
+                    SqlParameter venue = new SqlParameter();
+                    venue.ParameterName = "@venue_id";
+                    venue.Value = venueId;
+                    vcInsert.Parameters.Add(venue);
+
+
+               
+                    vcInsert.ExecuteScalar();
+                    vcCon.Close();
+                    vcCon.Open();
                     //Make sure vconfig was inserted and get its id
                     SqlCommand vcCheck = new SqlCommand();
-                    vcCheck.Connection = clconnection;
-                    vcCheck.CommandText = "SELECT * FROM dbo.venue_category vc	WHERE vc.venue_id = " + eventReader[7].ToString() + " AND vc.row_high =" +rowString + " AND vc.row_low = " + rowString+  " AND vc.section_low = " + sectionString ;
+                    vcCheck.Connection = vcCon;
+                    vcCheck.CommandText = "SELECT * FROM dbo.venue_category vc	WHERE vc.venue_id = " + venueId + " AND vc.row_high = \'" +rowString + "\' AND vc.row_low = \'" + rowString+  "\' AND vc.section_low = \'" + sectionString + "\'" ;
                     SqlDataReader vcReader = vcCheck.ExecuteReader();
                     vcReader.Read();
                     if (vcReader.HasRows)
                     {
                         // add catlisting directly
                         SqlCommand directCat = new SqlCommand();
-                        directCat.Connection = clconnection;
+                        SqlConnection fclCon = new SqlConnection(ConfigurationManager.ConnectionStrings["indux"].ConnectionString);
+                        directCat.Connection = fclCon;
+                        fclCon.Open();
                         directCat.CommandText = @"INSERT category_ticket_group(event_id, venue_category_id, ticket_count, wholesale_price, retail_price, notes, expected_arrival_date, face_price, cost, internal_notes, tax_exempt, update_datetime, broadcast, create_date, office_id
 		                                          , ticket_group_code_id, unbroadcast_days_before_event, shipping_method_special_id, show_near_term_option_id, price_update_datetime, tg_note_grandfathered, auto_process_web_requests, venue_configuration_zone_id, max_showing)
 	                                              OUTPUT INSERTED.category_ticket_group_id
-                                                  VALUES(@local_event_id, @venue_category_id, @quantity, 0, 0, \'\', @expected_arrival_date, 0, 0, \'Sale-RC\', 0, CURRENT_TIMESTAMP, 1, CURRENT_TIMESTAMP
+                                                  VALUES(@local_event_id, @venue_category_id, @quantity, 0, 0, '', @expected_arrival_date, 0, 0, 'Sale-RC', 0, CURRENT_TIMESTAMP, 0, CURRENT_TIMESTAMP
                                                   , 1, NULL, 0, 6, 2, NULL, 0, 1, NULL, NULL)";
 
+                        SqlParameter localevent = new SqlParameter();
+                        localevent.ParameterName = "@local_event_id";
+                        localevent.Value = localeventString;
+                        directCat.Parameters.Add(localevent);
+
+                        SqlParameter vcid = new SqlParameter();
+                        vcid.ParameterName = "@venue_category_id";
+                        vcid.Value = vcReader[0].ToString();
+                        directCat.Parameters.Add(vcid);
+
+                        SqlParameter qty = new SqlParameter();
+                        qty.ParameterName = "@quantity";
+                        qty.Value = qtyString;
+                        directCat.Parameters.Add(qty);
+
+                        SqlParameter arrival = new SqlParameter();
+                        arrival.ParameterName = "@expected_arrival_date";
+                        arrival.Value = onHand;
+                        directCat.Parameters.Add(arrival);
+/*
                         directCat.Parameters["@local_event_id"].Value = localeventString;
                         directCat.Parameters["@venue_category_id"].Value =vcReader[0].ToString() ;
                         directCat.Parameters["@quantity"].Value = qtyString;
-                        directCat.Parameters["@expected_arrival_date"].Value = onHand;
+                        directCat.Parameters["@expected_arrival_date"].Value = onHand;*/
                         catTgid = directCat.ExecuteScalar().ToString();
+                        if (Int32.Parse(catTgid) > 0)
+                        {
+                            for (int i = 1; i < Int32.Parse(qtyString)+1; i++)
+                            {
+                                directCat.CommandText = "INSERT into dbo.category_ticket (category_ticket_group_id,position,actual_price,invoice_id,ticket_id,processed,system_user_id,exchange_request_id,fill_date) Values(" + catTgid + "," + i.ToString() + ",0,NULL,NULL,0,1,NULL,NULL)";
+                                directCat.Parameters.Clear();
+                                directCat.ExecuteScalar();
 
+                            }
+                        } 
+
+
+                        vcCon.Close();
+                        fclCon.Close();
+
+                    }
+                    else
+                    {
+                        LogEntry("Cat LIsting Not Created: VC not added" , "fail");
+                        vcCon.Close();
+                        return 0;
                     }
 
                 } 
