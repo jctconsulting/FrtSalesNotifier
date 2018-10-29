@@ -14,13 +14,17 @@ using System.Configuration;
 
 namespace SaleNotifier
 {
-    class Program
+    public class Program
     {
         public static Boolean statusflag;
         public static String tgidString;
         public static String poidString;
         public static String invString;
         public static String soldString;
+        public static int brokerNum;
+        public static bool tntrans;
+
+
 
 
 
@@ -36,11 +40,7 @@ namespace SaleNotifier
 
             //sandbox - frt-vivdsql
             string connectionString = ConfigurationManager.ConnectionStrings["indux"].ConnectionString;
-             
-
-
             SqlConnection connection = new SqlConnection(connectionString);
-
             SqlCommand command = new SqlCommand();
             command.Connection = connection;
             command.CommandText = sqlstr;
@@ -58,6 +58,7 @@ namespace SaleNotifier
                     poidString = reader[3].ToString();
                     invString = reader[1].ToString();
                     soldString = reader[2].ToString();
+
                     // check to see if we have notified before
                     string specSaleString = ConfigurationManager.ConnectionStrings["TicketTracker"].ConnectionString;
                     SqlConnection specSaleConnection = new SqlConnection(specSaleString);
@@ -73,7 +74,7 @@ namespace SaleNotifier
 
                     // Make a REST post to jessica here - 
                     Console.WriteLine( reader[0].ToString(), reader[1].ToString());
-                    Uri endpoint = new Uri("https://jessica-cr.xyz/listings/consignment/sold");  
+                    Uri endpoint = new Uri("https://spec.pokemonion.com/listings/consignment/sold");        //("https://jessica-cr.xyz/listings/consignment/sold");  
                     string requeststr = "{\"ticketGroupId\":\"" + tgidString + "\" ,\"soldQuantity\":" + soldString +"}";
                     statusflag = false; //false -production
                     if (!notified)
@@ -92,7 +93,7 @@ namespace SaleNotifier
                         startInfo.WindowStyle = ProcessWindowStyle.Hidden;
                         startInfo.Arguments = reader[0].ToString();
                         Process.Start(startInfo);
-                        
+
 
                         /* check for previous log of this sale - primary key vio otherwise  
                         string specSaleString = ConfigurationManager.ConnectionStrings["TicketTracker"].ConnectionString;
@@ -104,7 +105,9 @@ namespace SaleNotifier
                         SqlDataReader saleReader = saleCommand.ExecuteReader();
                         saleReader.Read();
                         */
-                        
+                        tntrans = false;
+                        tntrans = checkTransactionType(Int32.Parse(tgidString));
+
                         if (!notified)
                         {
                             AddSpecSale();
@@ -114,8 +117,7 @@ namespace SaleNotifier
                         specSaleConnection.Close();
                         
                         
-                        bool tntrans = false;
-                        tntrans = checkTransactionType(Int32.Parse(tgidString));
+                        
                         if (!tntrans)
                         {
                             // Don't void PO if invoice fails to void - creates orphaned invoice
@@ -163,7 +165,7 @@ namespace SaleNotifier
 
             request.Method = "POST"; //"GET"; 
             request.ContentType = "application/json;charset=utf-8";
-            request.Headers.Add("Authorization", "Basic YXBwdXNlcjp5dWROOWJZRkdKdVlRRHBq");
+            request.Headers.Add("Authorization", "Basic c3BlYzptcDJ3ODRuUU05VlNOa1BK");
 
             System.Text.UTF8Encoding encoding = new System.Text.UTF8Encoding();
             byte[] bytes = encoding.GetBytes(data);
@@ -418,7 +420,7 @@ namespace SaleNotifier
                         {
                             for (int i = 1; i < Int32.Parse(qtyString)+1; i++)
                             {
-                                directCat.CommandText = "INSERT into dbo.category_ticket (category_ticket_group_id,position,actual_price,invoice_id,ticket_id,processed,system_user_id,exchange_request_id,fill_date) Values(" + catTgid + "," + i.ToString() + ",0,NULL,NULL,0,1,NULL,NULL)";
+                                directCat.CommandText = "INSERT into dbo.category_ticket (category_ticket_group_id,position,actual_price,invoice_id,ticket_id,processed,system_user_id,exchange_request_id,fill_date) Values(" + catTgid + "," + i.ToString() + ",-1.00,NULL,NULL,0,NULL,NULL,NULL)";
                                 directCat.Parameters.Clear();
                                 directCat.ExecuteScalar();
 
@@ -428,6 +430,7 @@ namespace SaleNotifier
 
                         vcCon.Close();
                         fclCon.Close();
+                      //   if (!tntrans) {SellCatListing(catTgid);}
 
                     }
                     else
@@ -456,6 +459,148 @@ namespace SaleNotifier
             
         }
 
+        public static Boolean SellCatListing(string catListStr)
+        {
+            string getTixStr = "Select [category_ticket_id],0,0,595 from Category_ticket where category_ticket_group_id = " + catListStr;
+            string connectionString = ConfigurationManager.ConnectionStrings["indux"].ConnectionString;
+            SqlConnection connection = new SqlConnection(connectionString);
+            SqlCommand Command = new SqlCommand();
+            Command.Connection = connection;
+            Command.CommandText = getTixStr;
+            SqlDataAdapter da = new SqlDataAdapter(Command);
+            DataTable tix = new DataTable();
+            da.Fill(tix);
+
+
+
+          /* 
+
+            string shipStr = @"INSERT into dbo.shipping_tracking(shipping_tracking_number, shipped_on_date, arrived_on_date, estimated_arrival_date, estimated_ship_date, notes, shipping_account_type_id, shipping_account_number_id, shipping_account_delivery_method_id, shipping_tracking_status_id, shipping_tracking_cost, will_call_pickup_name, runner_id, delivered_datetime, shipment_signed_for, runner_delivered_shipment_on, isreturned, cod_label_tracking_number, marked_for_call, called_awaiting_shipment, isdrop, save_path, ftp_location, system_user_id)
+ Values('', Getdate(), '1900-01-01 00:00:00.000', '1900-01-01 00:00:00.000', NULL, '', 4, NULL, 22, 1, 0.00, '', NULL, NULL, '-', NULL, 0, NULL, 0, 0, 1, '', '', NULL); set @id = SCOPE_IDENTITY();";
+            SqlCommand shipInsert = new SqlCommand();
+            shipInsert.Connection = connection;
+            connection.Open();
+            shipInsert.CommandText = shipStr;
+            SqlParameter id = new SqlParameter();
+            id.SqlDbType = System.Data.SqlDbType.Int;
+            id.ParameterName = "@id";
+            id.Value = 0;
+            id.Direction = System.Data.ParameterDirection.Output;
+
+
+            shipInsert.Parameters.Add(id);
+            shipInsert.ExecuteNonQuery();
+            string shipnum = id.Value.ToString();
+*/
+
+            string orderString = "Select [external_po_number],[client_broker_id] from dbo.purchaseOrder where purchase_order_id = " + poidString;
+            SqlCommand ordCommand = new SqlCommand();
+            ordCommand.Connection = connection;
+            ordCommand.CommandText = orderString;
+            connection.Open();
+            SqlDataReader ordreader = Command.ExecuteReader();
+            string addressid = "";
+            string extpo = "";
+
+            if (ordreader.HasRows)
+            {
+                ordreader.Read();
+                brokerNum = Int32.Parse(ordreader[1].ToString());
+                extpo = ordreader[0].ToString();
+                //get broker address 
+
+                string brokerString = "Select main_address_id from dbo.client_broker where client_broker_id = " + brokerNum;
+                SqlCommand brokerCommand = new SqlCommand();
+                SqlConnection brokerCon = new SqlConnection(connectionString);
+                brokerCommand.Connection = brokerCon;
+                brokerCommand.CommandText = brokerString;
+                brokerCon.Open();
+                SqlDataReader brokerReader = brokerCommand.ExecuteReader();
+
+                if (brokerReader.HasRows)
+                {
+                    brokerReader.Read();
+                    addressid = brokerReader[0].ToString();
+
+                }
+                
+
+            }
+
+
+            string invNotes = "Romans";
+            // empty table for invoice tix
+            // Create a new DataTable.
+            System.Data.DataTable rtix = new DataTable("invoiceTix");
+            // Declare variables for DataColumn and DataRow objects.
+            DataColumn column;
+            DataRow row;
+
+            // Create new DataColumn, set DataType, 
+            // ColumnName and add to DataTable.    
+            column = new DataColumn();
+            column.DataType = System.Type.GetType("System.Int32");
+            column.ColumnName = "ticket_id";
+            column.ReadOnly = true;
+            column.Unique = true;
+
+            rtix.Columns.Add(column);
+
+            column = new DataColumn();
+            column.DataType = System.Type.GetType("System.Int32");
+            column.ColumnName = "ticket_group_id";
+            column.ReadOnly = true;
+            column.Unique = true;
+
+            rtix.Columns.Add(column);
+
+            column = new DataColumn();
+            column.DataType = System.Type.GetType("System.Int32");
+            column.ColumnName = "seat_number";
+            column.ReadOnly = true;
+            column.Unique = true;
+
+            rtix.Columns.Add(column);
+
+            column = new DataColumn();
+            column.DataType = System.Type.GetType("System.Single"); 
+            column.ColumnName = "actual_sold_price";
+            column.ReadOnly = true;
+            column.Unique = true;
+
+            rtix.Columns.Add(column);
+
+
+            //==========================================
+
+
+            string invstr = "execute [dbo].[api_invoice_create] " + "\'\'" + ",NULL,24,null,4,null,null," + brokerNum + "," + addressid+ ",0,0,0,4," + "\'" + invNotes + "\',\'\',\'" + extpo + "\',5,1,1,\'\',@realtix,@tix,1,0,0,0";
+
+            SqlParameter rtixParm = new SqlParameter();
+            rtixParm.ParameterName = "@tix";
+            rtixParm.Value = tix;
+            rtixParm.TypeName = "[dbo].[invoice_category_ticket_tvt]";
+            //empty real tix
+            SqlParameter tixParm = new SqlParameter();
+            tixParm.ParameterName = "@realtix";
+            tixParm.Value = rtix;
+            tixParm.TypeName = "[dbo].[invoice_ticket_tvt]";
+
+
+            connection.Close();
+            SqlCommand invInsert = new SqlCommand();
+            invInsert.Connection = connection;
+            connection.Open();
+            invInsert.CommandText = invstr;
+            invInsert.Parameters.Add(tixParm);
+            invInsert.Parameters.Add(rtixParm);
+            string retval;
+            retval = invInsert.ExecuteScalar().ToString();
+            connection.Close();
+
+            return false;
+        }
+
 
         public static Boolean checkTransactionType(int TGID)
         {
@@ -474,7 +619,7 @@ namespace SaleNotifier
                          ticket_group INNER JOIN
                          event ON ticket_group.event_id = event.event_id INNER JOIN
                          venue ON event.venue_id = venue.venue_id ON ticket.ticket_group_id = ticket_group.ticket_group_id
-              WHERE        (invoice.mercury_transaction_id is null) and   (invoice.external_PO not like '0') and ticket_group.ticket_group_id =";
+              WHERE        (invoice.mercury_transaction_id is null) and   (invoice.external_PO not like '0') and  (invoice.external_PO not like 'n/a%')( and ticket_group.ticket_group_id =";
 
             sqlstr = sqlstr + TGID.ToString(); 
             Command.CommandText = sqlstr;

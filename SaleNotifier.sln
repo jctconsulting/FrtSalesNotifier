@@ -5,6 +5,8 @@ VisualStudioVersion = 15.0.27130.0
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SaleNotifier", "SaleNotifier\SaleNotifier.csproj", "{3D41FD7F-F879-4247-98B6-572146B8185C}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "UnitTestNotifier", "UnitTestNotifier\UnitTestNotifier.csproj", "{9BF319AE-372B-4639-B867-ED69D9E89452}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -15,6 +17,10 @@ Global
 		{3D41FD7F-F879-4247-98B6-572146B8185C}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{3D41FD7F-F879-4247-98B6-572146B8185C}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{3D41FD7F-F879-4247-98B6-572146B8185C}.Release|Any CPU.Build.0 = Release|Any CPU
+		{9BF319AE-372B-4639-B867-ED69D9E89452}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{9BF319AE-372B-4639-B867-ED69D9E89452}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{9BF319AE-372B-4639-B867-ED69D9E89452}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{9BF319AE-372B-4639-B867-ED69D9E89452}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
