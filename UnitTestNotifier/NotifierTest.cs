@@ -10,7 +10,7 @@ namespace UnitTestNotifier
         [TestMethod]
         public void TestMethod1()
         {
-            string CattoSell = "376899";
+            string CattoSell = "376902";
 
             Program.SellCatListing(CattoSell);
 

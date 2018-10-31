@@ -430,7 +430,7 @@ namespace SaleNotifier
 
                         vcCon.Close();
                         fclCon.Close();
-                      //   if (!tntrans) {SellCatListing(catTgid);}
+                        
 
                     }
                     else
@@ -443,7 +443,7 @@ namespace SaleNotifier
                 } 
           
                 LogEntry("Cat LIsting Created: " + catTgid, "success");
-
+                if (!tntrans) { SellCatListing(catTgid); }
                 return Int32.Parse(catTgid);
             }
             catch (Exception ex){
@@ -493,22 +493,37 @@ namespace SaleNotifier
             string shipnum = id.Value.ToString();
 */
 
-            string orderString = "Select [external_po_number],[client_broker_id] from dbo.purchaseOrder where purchase_order_id = " + poidString;
+            string orderString = "Select [external_po_number],[client_broker_id] from dbo.purchase_Order where purchase_order_id = " + poidString;
             SqlCommand ordCommand = new SqlCommand();
             ordCommand.Connection = connection;
             ordCommand.CommandText = orderString;
             connection.Open();
-            SqlDataReader ordreader = Command.ExecuteReader();
+            SqlDataReader ordreader = ordCommand.ExecuteReader();
             string addressid = "";
             string extpo = "";
+
+
+            string cbinvoice = "SELECT [invoice_id],[client_broker_id],[client_broker_employee_id] FROM [dbo].[client_broker_invoice]  where invoice_id =" + invString;
 
             if (ordreader.HasRows)
             {
                 ordreader.Read();
-                brokerNum = Int32.Parse(ordreader[1].ToString());
                 extpo = ordreader[0].ToString();
-                //get broker address 
+            }
+            connection.Close();
+            ordreader.Close();
+            ordCommand.CommandText = cbinvoice;            
+            connection.Open();
+            ordreader = ordCommand.ExecuteReader();
 
+
+            //  ordreader.Open
+            if (ordreader.HasRows)
+            {
+                ordreader.Read();
+
+                //get broker address 
+                brokerNum = Int32.Parse(ordreader[1].ToString());
                 string brokerString = "Select main_address_id from dbo.client_broker where client_broker_id = " + brokerNum;
                 SqlCommand brokerCommand = new SqlCommand();
                 SqlConnection brokerCon = new SqlConnection(connectionString);
@@ -523,6 +538,7 @@ namespace SaleNotifier
                     addressid = brokerReader[0].ToString();
 
                 }
+               
                 
 
             }
@@ -619,7 +635,7 @@ namespace SaleNotifier
                          ticket_group INNER JOIN
                          event ON ticket_group.event_id = event.event_id INNER JOIN
                          venue ON event.venue_id = venue.venue_id ON ticket.ticket_group_id = ticket_group.ticket_group_id
-              WHERE        (invoice.mercury_transaction_id is null) and   (invoice.external_PO not like '0') and  (invoice.external_PO not like 'n/a%')( and ticket_group.ticket_group_id =";
+              WHERE        (invoice.mercury_transaction_id is null) and   (invoice.external_PO not like '0') and  (invoice.external_PO not like 'n/a%') and ticket_group.ticket_group_id =";
 
             sqlstr = sqlstr + TGID.ToString(); 
             Command.CommandText = sqlstr;
