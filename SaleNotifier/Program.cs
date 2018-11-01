@@ -289,7 +289,9 @@ namespace SaleNotifier
             String sectionString =   reader[10].ToString();
             String seathighString = "0"; //reader[22].ToString();
             String seatlowString = "0"; //reader[23].ToString();
-            String qtyString = reader[4].ToString();
+
+            String qtyString = soldString;//reader[4].ToString();
+
             String localeventString = reader[14].ToString();
 
 
