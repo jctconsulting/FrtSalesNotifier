@@ -28,9 +28,10 @@ C:\Users\Administrator.JCT-MPSTUDIO\Documents\Source\Repos\salesnotifier\SaleNot
 C:\Users\Administrator.JCT-MPSTUDIO\Documents\Source\Repos\salesnotifier\SaleNotifier\bin\Debug\SaleNotifier.exe
 C:\Users\Administrator.JCT-MPSTUDIO\Documents\Source\Repos\salesnotifier\SaleNotifier\bin\Debug\SaleNotifier.pdb
 C:\Users\Administrator.JCT-MPSTUDIO\Documents\Source\Repos\salesnotifier\SaleNotifier\bin\Debug\Newtonsoft.Json.dll
-C:\Users\Administrator.JCT-MPSTUDIO\Documents\Source\Repos\salesnotifier\SaleNotifier\obj\Debug\SaleNotifier.csprojResolveAssemblyReference.cache
 C:\Users\Administrator.JCT-MPSTUDIO\Documents\Source\Repos\salesnotifier\SaleNotifier\obj\Debug\SaleNotifier.SQLStrings.resources
 C:\Users\Administrator.JCT-MPSTUDIO\Documents\Source\Repos\salesnotifier\SaleNotifier\obj\Debug\SaleNotifier.csproj.GenerateResource.Cache
 C:\Users\Administrator.JCT-MPSTUDIO\Documents\Source\Repos\salesnotifier\SaleNotifier\obj\Debug\SaleNotifier.csproj.CoreCompileInputs.cache
 C:\Users\Administrator.JCT-MPSTUDIO\Documents\Source\Repos\salesnotifier\SaleNotifier\obj\Debug\SaleNotifier.exe
 C:\Users\Administrator.JCT-MPSTUDIO\Documents\Source\Repos\salesnotifier\SaleNotifier\obj\Debug\SaleNotifier.pdb
+C:\Users\Administrator.JCT-MPSTUDIO\Documents\Source\Repos\salesnotifier\SaleNotifier\obj\Debug\SaleNotifier.csprojAssemblyReference.cache
+C:\Users\Administrator.JCT-MPSTUDIO\Documents\Source\Repos\salesnotifier\SaleNotifier\obj\Debug\SaleNotifier.csproj.CopyComplete

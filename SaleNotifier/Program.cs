@@ -21,6 +21,8 @@ namespace SaleNotifier
         public static String poidString;
         public static String invString;
         public static String soldString;
+        public static String priceString;
+        public static String extpoString;
         public static int brokerNum;
         public static bool tntrans;
 
@@ -93,18 +95,7 @@ namespace SaleNotifier
                         startInfo.WindowStyle = ProcessWindowStyle.Hidden;
                         startInfo.Arguments = reader[0].ToString();
                         Process.Start(startInfo);
-
-
-                        /* check for previous log of this sale - primary key vio otherwise  
-                        string specSaleString = ConfigurationManager.ConnectionStrings["TicketTracker"].ConnectionString;
-                        SqlConnection specSaleConnection = new SqlConnection(specSaleString);
-                        specSaleConnection.Open();
-                        SqlCommand saleCommand = new SqlCommand();
-                        saleCommand.Connection = specSaleConnection;
-                        saleCommand.CommandText = "Select * from SpecSales where ticket_group_id = " + tgidString;
-                        SqlDataReader saleReader = saleCommand.ExecuteReader();
-                        saleReader.Read();
-                        */
+                                                                    
                         tntrans = false;
                         tntrans = checkTransactionType(Int32.Parse(tgidString));
 
@@ -114,9 +105,7 @@ namespace SaleNotifier
                             //Create cat even if we aren't reversing inv/po out - but don't do listing has already been processed
                             CreateCatListing(reader[0].ToString());
                         }
-                        specSaleConnection.Close();
-                        
-                        
+                        specSaleConnection.Close(); 
                         
                         if (!tntrans)
                         {
@@ -128,12 +117,10 @@ namespace SaleNotifier
                             else
                             {
                                 LogEntry("PO not voided - Invoice void failed", "fail");
-
                             }
                         }
                         else
                         {
-
                             LogEntry("Tnet Transaction - Nothing Voided", "warn");
                         }
                        
@@ -141,7 +128,10 @@ namespace SaleNotifier
                     }
                     else
                     {
-                        LogEntry("Jessica did not Accept", "fail");
+                        if (!notified)//only log an actual fail rather than  skipped
+                        {
+                            LogEntry("Jessica did not Accept", "fail");
+                        }
 
                     }
                 }
@@ -463,7 +453,7 @@ namespace SaleNotifier
 
         public static Boolean SellCatListing(string catListStr)
         {
-            string getTixStr = "Select [category_ticket_id],0,0,595 from Category_ticket where category_ticket_group_id = " + catListStr;
+            string getTixStr = "Select [category_ticket_id],0,0," + priceString + " from Category_ticket where category_ticket_group_id = " + catListStr;
             string connectionString = ConfigurationManager.ConnectionStrings["indux"].ConnectionString;
             SqlConnection connection = new SqlConnection(connectionString);
             SqlCommand Command = new SqlCommand();
@@ -511,6 +501,7 @@ namespace SaleNotifier
             {
                 ordreader.Read();
                 extpo = ordreader[0].ToString();
+
             }
             connection.Close();
             ordreader.Close();
@@ -592,7 +583,7 @@ namespace SaleNotifier
             //==========================================
 
 
-            string invstr = "execute [dbo].[api_invoice_create] " + "\'\'" + ",NULL,24,null,4,null,null," + brokerNum + "," + addressid+ ",0,0,0,4," + "\'" + invNotes + "\',\'\',\'" + extpo + "\',5,1,1,\'\',@realtix,@tix,1,0,0,0";
+            string invstr = "execute [dbo].[api_invoice_create] " + "\'\'" + ",NULL,24,null,4,null,null," + brokerNum + "," + addressid+ ",0,0,0,4," + "\'" + invNotes + "\',\'\',\'" + extpoString + "\',5,1,1,\'\',@realtix,@tix,1,0,0,0";
 
             SqlParameter rtixParm = new SqlParameter();
             rtixParm.ParameterName = "@tix";
@@ -699,8 +690,13 @@ namespace SaleNotifier
 
             string venueString = specReader[5].ToString();
             venueString = venueString.Replace("'", "''");
-
-
+            //set this here so we can use for selling out cat
+            //use atif calc total div qty - account for takebacks from exchanges.
+            int qty;
+            Int32.TryParse(soldString, out qty);
+            float price = (float.Parse(specReader[15].ToString()) / qty );
+            priceString = price.ToString();
+            extpoString = specReader[1].ToString();
 
             string specRecord = @"INSERT INTO [dbo].[SpecSales]
                                             ([Ticket_group_id],[invoice_id],[purchase_order_id],[Ordernum],[ExternalPO],[EventName],[EventDate],[VenueName],[State],[City],[Quantity],[Section],[Row],[SalePrice],[OrderTotal],[SaleDate])
