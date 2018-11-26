@@ -682,12 +682,17 @@ namespace SaleNotifier
             string venueString = specReader[5].ToString();
             venueString = venueString.Replace("'", "''");
 
+            // Get client broker from id
+
+
+            string clientbroker = "";
+
 
 
             string specRecord = @"INSERT INTO [dbo].[SpecSales]
-                                            ([Ticket_group_id],[invoice_id],[purchase_order_id],[Ordernum],[ExternalPO],[EventName],[EventDate],[VenueName],[State],[City],[Quantity],[Section],[Row],[SalePrice],[OrderTotal],[SaleDate])
+                                            ([Ticket_group_id],[invoice_id],[purchase_order_id],[Ordernum],[ExternalPO],[EventName],[EventDate],[VenueName],[State],[City],[Quantity],[Section],[Row],[SalePrice],[OrderTotal],[SaleDate],[filled],[shipped],[assignedto],[soldto])
                                             VALUES
-                                            (" + tgidString + "," + invString + "," + poidString + ",\'" +specReader[0].ToString() +  "\',\'" +  specReader[1].ToString() + "\',\'" + eventString + "\',\'" + specReader[4].ToString() + "\',\'" + venueString + "\',\'" + "\',\'\',\'"  + soldString +"\',\'" + specReader[10].ToString() + "\',\'" + specReader[9].ToString() + "\',\'" + specReader[8].ToString() + "\',\'" + specReader[15].ToString() + "\',\'" + specReader[17].ToString() + "\')";
+                                            (" + tgidString + "," + invString + "," + poidString + ",\'" +specReader[0].ToString() +  "\',\'" +  specReader[1].ToString() + "\',\'" + eventString + "\',\'" + specReader[4].ToString() + "\',\'" + venueString + "\',\'" + "\',\'\',\'"  + soldString +"\',\'" + specReader[10].ToString() + "\',\'" + specReader[9].ToString() + "\',\'" + specReader[8].ToString() + "\',\'" + specReader[15].ToString() + "\',\'" + specReader[17].ToString() + "\'" +",null,null,null," + clientbroker +  ")";
 
             SqlCommand insSpecRecord = new SqlCommand();
             insSpecRecord.Connection = specSaleConnection;
