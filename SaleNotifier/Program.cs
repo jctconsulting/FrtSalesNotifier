@@ -21,6 +21,8 @@ namespace SaleNotifier
         public static String poidString;
         public static String invString;
         public static String soldString;
+        public static String priceString;
+        public static String extpoString;
         public static int brokerNum;
         public static bool tntrans;
 
@@ -93,18 +95,7 @@ namespace SaleNotifier
                         startInfo.WindowStyle = ProcessWindowStyle.Hidden;
                         startInfo.Arguments = reader[0].ToString();
                         Process.Start(startInfo);
-
-
-                        /* check for previous log of this sale - primary key vio otherwise  
-                        string specSaleString = ConfigurationManager.ConnectionStrings["TicketTracker"].ConnectionString;
-                        SqlConnection specSaleConnection = new SqlConnection(specSaleString);
-                        specSaleConnection.Open();
-                        SqlCommand saleCommand = new SqlCommand();
-                        saleCommand.Connection = specSaleConnection;
-                        saleCommand.CommandText = "Select * from SpecSales where ticket_group_id = " + tgidString;
-                        SqlDataReader saleReader = saleCommand.ExecuteReader();
-                        saleReader.Read();
-                        */
+                                                                    
                         tntrans = false;
                         tntrans = checkTransactionType(Int32.Parse(tgidString));
 
@@ -114,9 +105,7 @@ namespace SaleNotifier
                             //Create cat even if we aren't reversing inv/po out - but don't do listing has already been processed
                             CreateCatListing(reader[0].ToString());
                         }
-                        specSaleConnection.Close();
-                        
-                        
+                        specSaleConnection.Close(); 
                         
                         if (!tntrans)
                         {
@@ -128,12 +117,10 @@ namespace SaleNotifier
                             else
                             {
                                 LogEntry("PO not voided - Invoice void failed", "fail");
-
                             }
                         }
                         else
                         {
-
                             LogEntry("Tnet Transaction - Nothing Voided", "warn");
                         }
                        
@@ -141,7 +128,10 @@ namespace SaleNotifier
                     }
                     else
                     {
-                        LogEntry("Jessica did not Accept", "fail");
+                        if (!notified)//only log an actual fail rather than  skipped
+                        {
+                            LogEntry("Jessica did not Accept", "fail");
+                        }
 
                     }
                 }
@@ -289,7 +279,9 @@ namespace SaleNotifier
             String sectionString =   reader[10].ToString();
             String seathighString = "0"; //reader[22].ToString();
             String seatlowString = "0"; //reader[23].ToString();
-            String qtyString = reader[4].ToString();
+
+            String qtyString = soldString;//reader[4].ToString();
+
             String localeventString = reader[14].ToString();
 
 
@@ -430,7 +422,7 @@ namespace SaleNotifier
 
                         vcCon.Close();
                         fclCon.Close();
-                      //   if (!tntrans) {SellCatListing(catTgid);}
+                        
 
                     }
                     else
@@ -443,7 +435,7 @@ namespace SaleNotifier
                 } 
           
                 LogEntry("Cat LIsting Created: " + catTgid, "success");
-
+                if (!tntrans) { SellCatListing(catTgid); }
                 return Int32.Parse(catTgid);
             }
             catch (Exception ex){
@@ -461,7 +453,7 @@ namespace SaleNotifier
 
         public static Boolean SellCatListing(string catListStr)
         {
-            string getTixStr = "Select [category_ticket_id],0,0,595 from Category_ticket where category_ticket_group_id = " + catListStr;
+            string getTixStr = "Select [category_ticket_id],0,0," + priceString + " from Category_ticket where category_ticket_group_id = " + catListStr;
             string connectionString = ConfigurationManager.ConnectionStrings["indux"].ConnectionString;
             SqlConnection connection = new SqlConnection(connectionString);
             SqlCommand Command = new SqlCommand();
@@ -493,22 +485,38 @@ namespace SaleNotifier
             string shipnum = id.Value.ToString();
 */
 
-            string orderString = "Select [external_po_number],[client_broker_id] from dbo.purchaseOrder where purchase_order_id = " + poidString;
+            string orderString = "Select [external_po_number],[client_broker_id] from dbo.purchase_Order where purchase_order_id = " + poidString;
             SqlCommand ordCommand = new SqlCommand();
             ordCommand.Connection = connection;
             ordCommand.CommandText = orderString;
             connection.Open();
-            SqlDataReader ordreader = Command.ExecuteReader();
+            SqlDataReader ordreader = ordCommand.ExecuteReader();
             string addressid = "";
             string extpo = "";
+
+
+            string cbinvoice = "SELECT [invoice_id],[client_broker_id],[client_broker_employee_id] FROM [dbo].[client_broker_invoice]  where invoice_id =" + invString;
 
             if (ordreader.HasRows)
             {
                 ordreader.Read();
-                brokerNum = Int32.Parse(ordreader[1].ToString());
                 extpo = ordreader[0].ToString();
-                //get broker address 
 
+            }
+            connection.Close();
+            ordreader.Close();
+            ordCommand.CommandText = cbinvoice;            
+            connection.Open();
+            ordreader = ordCommand.ExecuteReader();
+
+
+            //  ordreader.Open
+            if (ordreader.HasRows)
+            {
+                ordreader.Read();
+
+                //get broker address 
+                brokerNum = Int32.Parse(ordreader[1].ToString());
                 string brokerString = "Select main_address_id from dbo.client_broker where client_broker_id = " + brokerNum;
                 SqlCommand brokerCommand = new SqlCommand();
                 SqlConnection brokerCon = new SqlConnection(connectionString);
@@ -523,6 +531,7 @@ namespace SaleNotifier
                     addressid = brokerReader[0].ToString();
 
                 }
+               
                 
 
             }
@@ -574,7 +583,7 @@ namespace SaleNotifier
             //==========================================
 
 
-            string invstr = "execute [dbo].[api_invoice_create] " + "\'\'" + ",NULL,24,null,4,null,null," + brokerNum + "," + addressid+ ",0,0,0,4," + "\'" + invNotes + "\',\'\',\'" + extpo + "\',5,1,1,\'\',@realtix,@tix,1,0,0,0";
+            string invstr = "execute [dbo].[api_invoice_create] " + "\'\'" + ",NULL,24,null,4,null,null," + brokerNum + "," + addressid+ ",0,0,0,4," + "\'" + invNotes + "\',\'\',\'" + extpoString + "\',5,1,1,\'\',@realtix,@tix,1,0,0,0";
 
             SqlParameter rtixParm = new SqlParameter();
             rtixParm.ParameterName = "@tix";
@@ -619,7 +628,7 @@ namespace SaleNotifier
                          ticket_group INNER JOIN
                          event ON ticket_group.event_id = event.event_id INNER JOIN
                          venue ON event.venue_id = venue.venue_id ON ticket.ticket_group_id = ticket_group.ticket_group_id
-              WHERE        (invoice.mercury_transaction_id is null) and   (invoice.external_PO not like '0') and  (invoice.external_PO not like 'n/a%')( and ticket_group.ticket_group_id =";
+              WHERE        (invoice.mercury_transaction_id is null) and   (invoice.external_PO not like '0') and  (invoice.external_PO not like 'n/a%') and ticket_group.ticket_group_id =";
 
             sqlstr = sqlstr + TGID.ToString(); 
             Command.CommandText = sqlstr;
@@ -681,18 +690,18 @@ namespace SaleNotifier
 
             string venueString = specReader[5].ToString();
             venueString = venueString.Replace("'", "''");
-
-            // Get client broker from id
-
-
-            string clientbroker = "";
-
-
+            //set this here so we can use for selling out cat
+            //use atif calc total div qty - account for takebacks from exchanges.
+            int qty;
+            Int32.TryParse(soldString, out qty);
+            float price = (float.Parse(specReader[15].ToString()) / qty );
+            priceString = price.ToString();
+            extpoString = specReader[1].ToString();
 
             string specRecord = @"INSERT INTO [dbo].[SpecSales]
-                                            ([Ticket_group_id],[invoice_id],[purchase_order_id],[Ordernum],[ExternalPO],[EventName],[EventDate],[VenueName],[State],[City],[Quantity],[Section],[Row],[SalePrice],[OrderTotal],[SaleDate],[filled],[shipped],[assignedto],[soldto])
+                                            ([Ticket_group_id],[invoice_id],[purchase_order_id],[Ordernum],[ExternalPO],[EventName],[EventDate],[VenueName],[State],[City],[Quantity],[Section],[Row],[SalePrice],[OrderTotal],[SaleDate])
                                             VALUES
-                                            (" + tgidString + "," + invString + "," + poidString + ",\'" +specReader[0].ToString() +  "\',\'" +  specReader[1].ToString() + "\',\'" + eventString + "\',\'" + specReader[4].ToString() + "\',\'" + venueString + "\',\'" + "\',\'\',\'"  + soldString +"\',\'" + specReader[10].ToString() + "\',\'" + specReader[9].ToString() + "\',\'" + specReader[8].ToString() + "\',\'" + specReader[15].ToString() + "\',\'" + specReader[17].ToString() + "\'" +",null,null,null," + clientbroker +  ")";
+                                            (" + tgidString + "," + invString + "," + poidString + ",\'" +specReader[0].ToString() +  "\',\'" +  specReader[1].ToString() + "\',\'" + eventString + "\',\'" + specReader[4].ToString() + "\',\'" + venueString + "\',\'" + "\',\'\',\'"  + soldString +"\',\'" + specReader[10].ToString() + "\',\'" + specReader[9].ToString() + "\',\'" + specReader[8].ToString() + "\',\'" + specReader[15].ToString() + "\',\'" + specReader[17].ToString() + "\')";
 
             SqlCommand insSpecRecord = new SqlCommand();
             insSpecRecord.Connection = specSaleConnection;
