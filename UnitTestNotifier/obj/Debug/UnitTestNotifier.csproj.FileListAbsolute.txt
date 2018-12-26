@@ -10,7 +10,6 @@ C:\Users\rich\Documents\Source\Repos\SalesNofifier\salesnotifier\UnitTestNotifie
 C:\Users\rich\Documents\Source\Repos\SalesNofifier\salesnotifier\UnitTestNotifier\bin\Debug\SaleNotifier.exe.config
 C:\Users\rich\Documents\Source\Repos\SalesNofifier\salesnotifier\UnitTestNotifier\bin\Debug\Microsoft.VisualStudio.TestPlatform.TestFramework.xml
 C:\Users\rich\Documents\Source\Repos\SalesNofifier\salesnotifier\UnitTestNotifier\bin\Debug\Microsoft.VisualStudio.TestPlatform.TestFramework.Extensions.xml
-C:\Users\rich\Documents\Source\Repos\SalesNofifier\salesnotifier\UnitTestNotifier\obj\Debug\UnitTestNotifier.csprojResolveAssemblyReference.cache
 C:\Users\rich\Documents\Source\Repos\SalesNofifier\salesnotifier\UnitTestNotifier\obj\Debug\UnitTestNotifier.csproj.CoreCompileInputs.cache
 C:\Users\rich\Documents\Source\Repos\SalesNofifier\salesnotifier\UnitTestNotifier\obj\Debug\UnitTestNotifier.dll
 C:\Users\rich\Documents\Source\Repos\SalesNofifier\salesnotifier\UnitTestNotifier\obj\Debug\UnitTestNotifier.pdb
@@ -32,3 +31,5 @@ C:\Users\Administrator.JCT-MPSTUDIO\Documents\Source\Repos\salesnotifier\UnitTes
 C:\Users\Administrator.JCT-MPSTUDIO\Documents\Source\Repos\salesnotifier\UnitTestNotifier\obj\Debug\UnitTestNotifier.csproj.CoreCompileInputs.cache
 C:\Users\Administrator.JCT-MPSTUDIO\Documents\Source\Repos\salesnotifier\UnitTestNotifier\obj\Debug\UnitTestNotifier.dll
 C:\Users\Administrator.JCT-MPSTUDIO\Documents\Source\Repos\salesnotifier\UnitTestNotifier\obj\Debug\UnitTestNotifier.pdb
+C:\Users\rich\Documents\Source\Repos\SalesNofifier\salesnotifier\UnitTestNotifier\obj\Debug\UnitTestNotifier.csprojAssemblyReference.cache
+C:\Users\rich\Documents\Source\Repos\SalesNofifier\salesnotifier\UnitTestNotifier\obj\Debug\UnitTestNotifier.csproj.CopyComplete

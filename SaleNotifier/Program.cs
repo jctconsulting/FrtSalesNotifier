@@ -71,12 +71,12 @@ namespace SaleNotifier
                     SqlDataReader saleReader = saleCommand.ExecuteReader();
                     saleReader.Read();
                     Boolean notified = saleReader.HasRows;
-                   
-                   
+                    specSaleConnection.Close();
 
-                    // Make a REST post to jessica here - 
+
+                    // Make a REST post to Spec here - 
                     Console.WriteLine( reader[0].ToString(), reader[1].ToString());
-                    Uri endpoint = new Uri("https://spec.pokemonion.com/listings/consignment/sold");        //("https://jessica-cr.xyz/listings/consignment/sold");  
+                    Uri endpoint = new Uri("https://spec.pokemonion.com/listings/consignment/sold");        
                     string requeststr = "{\"ticketGroupId\":\"" + tgidString + "\" ,\"soldQuantity\":" + soldString +"}";
                     statusflag = false; //false -production
                     if (!notified)
@@ -85,9 +85,8 @@ namespace SaleNotifier
                     }
                     
                     if (statusflag){
-
-
-                        // *************Removed for testing************
+                      
+                        //unbroadcast listing to avoid double sale if void process doesn't execute properly (or we have a customer order)
                         ProcessStartInfo startInfo = new ProcessStartInfo();
                         startInfo.CreateNoWindow = true;
                         startInfo.UseShellExecute = false;
@@ -105,7 +104,7 @@ namespace SaleNotifier
                             //Create cat even if we aren't reversing inv/po out - but don't do listing has already been processed
                             CreateCatListing(reader[0].ToString());
                         }
-                        specSaleConnection.Close(); 
+                        
                         
                         if (!tntrans)
                         {
@@ -245,6 +244,7 @@ namespace SaleNotifier
             catch(Exception ex)
             {
                 LogEntry("PO not voided:" + ex.Message, "fail");
+                voidCon.Close();
                 return 1;
             }
 
@@ -402,11 +402,7 @@ namespace SaleNotifier
                         arrival.ParameterName = "@expected_arrival_date";
                         arrival.Value = onHand;
                         directCat.Parameters.Add(arrival);
-/*
-                        directCat.Parameters["@local_event_id"].Value = localeventString;
-                        directCat.Parameters["@venue_category_id"].Value =vcReader[0].ToString() ;
-                        directCat.Parameters["@quantity"].Value = qtyString;
-                        directCat.Parameters["@expected_arrival_date"].Value = onHand;*/
+
                         catTgid = directCat.ExecuteScalar().ToString();
                         if (Int32.Parse(catTgid) > 0)
                         {
@@ -432,15 +428,39 @@ namespace SaleNotifier
                         return 0;
                     }
 
-                } 
-          
+                }
+                clconnection.Close();
                 LogEntry("Cat LIsting Created: " + catTgid, "success");
                 if (!tntrans) { SellCatListing(catTgid); }
+                else {
+                    // sell to 0 if merc
+                    string mercstring = @"SELECT DISTINCT  ticket_group.ticket_group_id, ticket_group.internal_notes, ticket_group.client_broker_id, ticket_group.client_broker_employee_id, invoice.external_PO, invoice.mercury_transaction_id
+                  FROM invoice INNER JOIN
+                             ticket ON invoice.invoice_id = ticket.invoice_id RIGHT OUTER JOIN
+                             ticket_group  ON ticket.ticket_group_id = ticket_group.ticket_group_id
+                  where ticket_group.ticket_group_id = ";
+
+                    mercstring += tgidString;
+                    string mercID = "";
+                    SqlConnection merccon = new SqlConnection(ConfigurationManager.ConnectionStrings["indux"].ConnectionString);
+                    SqlCommand mercCommand = new SqlCommand();
+                    mercCommand.CommandText = mercstring;
+                    SqlDataReader mercReader = mercCommand.ExecuteReader();
+                    mercReader.Read();
+                    if (mercReader.HasRows)
+                    {
+                        mercID = mercReader[5].ToString();
+                    }
+                    SellCatListing(catTgid, true);
+
+                }
+
                 return Int32.Parse(catTgid);
             }
             catch (Exception ex){
 
                 LogEntry("Cat LIsting Creation Failed:" + ex.Message, "fail");
+                clconnection.Close();
                 return 0;
             }
             //clconnection.Open();
@@ -451,9 +471,19 @@ namespace SaleNotifier
             
         }
 
-        public static Boolean SellCatListing(string catListStr)
+        public static Boolean SellCatListing(string catListStr,bool merc = false)
         {
-            string getTixStr = "Select [category_ticket_id],0,0," + priceString + " from Category_ticket where category_ticket_group_id = " + catListStr;
+
+            string getTixStr = "";
+            if (merc)
+            {
+                getTixStr = "Select [category_ticket_id],0,0,0 from Category_ticket where category_ticket_group_id = " + catListStr;
+            }
+
+            else
+            {
+                getTixStr = "Select [category_ticket_id],0,0," + priceString + " from Category_ticket where category_ticket_group_id = " + catListStr;
+            }
             string connectionString = ConfigurationManager.ConnectionStrings["indux"].ConnectionString;
             SqlConnection connection = new SqlConnection(connectionString);
             SqlCommand Command = new SqlCommand();
@@ -531,9 +561,9 @@ namespace SaleNotifier
                     addressid = brokerReader[0].ToString();
 
                 }
-               
-                
 
+
+                brokerCon.Close();
             }
 
 
@@ -606,7 +636,7 @@ namespace SaleNotifier
             string retval;
             retval = invInsert.ExecuteScalar().ToString();
             connection.Close();
-
+            
             return false;
         }
 
@@ -637,14 +667,18 @@ namespace SaleNotifier
            // string venueName = Reader[0].ToString();
 
             if (Reader.HasRows)
-            {               
+            {
                 //this is a not tnet trans
+                connection.Close();
                 return false;
             }
             else
             {
+                
+                connection.Close();
                 return true;
             }
+            
 
         }
          public static void LogEntry(string message,string status)
@@ -710,7 +744,7 @@ namespace SaleNotifier
             //get client broker
 
             string specRecord = @"INSERT INTO [dbo].[SpecSales]
-                                            ([Ticket_group_id],[invoice_id],[purchase_order_id],[Ordernum],[ExternalPO],[EventName],[EventDate],[VenueName],[State],[City],[Quantity],[Section],[Row],[SalePrice],[OrderTotal],[SaleDate],[filled],[shipped],[assignedto],[soldto])
+                                            ([Ticket_group_id],[invoice_id],[purchase_order_id],[Ordernum],[ExternalPO],[EventName],[EventDate],[VenueName],[State],[City],[Quantity],[Section],[Row],[SalePrice],[OrderTotal],[SaleDate],[filled],[shipped],[assigned],[soldto])
                                             VALUES
                                             (" + tgidString + "," + invString + "," + poidString + ",\'" + specReader[0].ToString() + "\',\'" + specReader[1].ToString() + "\',\'" + eventString + "\',\'" + specReader[4].ToString() + "\',\'" + venueString + "\',\'" + "\',\'\',\'" + soldString + "\',\'" + specReader[10].ToString() + "\',\'" + specReader[9].ToString() + "\',\'" + specReader[8].ToString() + "\',\'" + specReader[15].ToString() + "\',\'" + specReader[17].ToString() + "\'" + ",null,null,null," + clientBroker + ")";
 
