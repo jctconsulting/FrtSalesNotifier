@@ -20,6 +20,7 @@ namespace SaleNotifier
         public static String tgidString;
         public static String poidString;
         public static String invString;
+        public static String catInvString;
         public static String soldString;
         public static String priceString;
         public static String extpoString;
@@ -434,7 +435,7 @@ namespace SaleNotifier
                 if (!tntrans) { SellCatListing(catTgid); }
                 else {
                     // sell to 0 if merc
-                    string mercstring = @"SELECT DISTINCT  ticket_group.ticket_group_id, ticket_group.internal_notes, ticket_group.client_broker_id, ticket_group.client_broker_employee_id, invoice.external_PO, invoice.mercury_transaction_id
+                    string mercstring = @"SELECT DISTINCT  ticket_group.ticket_group_id, ticket_group.internal_notes, ticket_group.client_broker_id, ticket_group.client_broker_employee_id, invoice.external_PO, invoice.mercury_transaction_id,invoice.ticket_request_id
                   FROM invoice INNER JOIN
                              ticket ON invoice.invoice_id = ticket.invoice_id RIGHT OUTER JOIN
                              ticket_group  ON ticket.ticket_group_id = ticket_group.ticket_group_id
@@ -443,15 +444,147 @@ namespace SaleNotifier
                     mercstring += tgidString;
                     string mercID = "";
                     SqlConnection merccon = new SqlConnection(ConfigurationManager.ConnectionStrings["indux"].ConnectionString);
+                    merccon.Open();
                     SqlCommand mercCommand = new SqlCommand();
                     mercCommand.CommandText = mercstring;
+                    mercCommand.Connection = merccon;
                     SqlDataReader mercReader = mercCommand.ExecuteReader();
                     mercReader.Read();
                     if (mercReader.HasRows)
                     {
                         mercID = mercReader[5].ToString();
                     }
-                    SellCatListing(catTgid, true);
+                    merccon.Close();
+                    if (mercID.Length > 0)
+                    {
+                        SellCatListing(catTgid, true);
+                        //we need mercid on invoicenotes
+                    }
+                    //it is a customer order
+                    else
+                    {
+                        // get ticket request id before we void 
+                        string trid = "";
+                        string invtot = "";
+                        SqlConnection trcon = new SqlConnection(ConfigurationManager.ConnectionStrings["indux"].ConnectionString);
+                        trcon.Open();
+                        string trstring  = "Select ticket_request_id,invoice_total from invoice where invoice_id = " + invString;
+                        SqlCommand trcommand = new SqlCommand();
+                        trcommand.Connection = trcon;
+                        trcommand.CommandText = trstring;
+                        SqlDataReader trreader = trcommand.ExecuteReader();
+                        trreader.Read();
+                        if (trreader.HasRows)
+                        {
+                            trid = trreader[0].ToString();
+                            invtot = trreader[1].ToString();
+                        }
+                        trcon.Close();
+                        // we can only void and so forth if we can attach trid to new invoice
+                        if(trid.Length >0)
+                        {
+                            
+
+
+                            if (VoidInvoice(Int32.Parse(invString)) == 0)
+                            {
+                                VoidPO(Int32.Parse(poidString));
+                            }
+                            else
+                            {
+                                LogEntry("PO not voided - Invoice void failed", "fail");
+                            }
+
+
+                            //make sure new invoice has old ticket request id
+                            string custstring = "Select client_id from client_invoice where invoice_id = " + invString;
+                            SqlConnection custcon = new SqlConnection(ConfigurationManager.ConnectionStrings["indux"].ConnectionString);
+                            custcon.Open();
+                            SqlCommand custCommand = new SqlCommand();
+                            custCommand.CommandText = custstring;
+                            custCommand.Connection = custcon;
+                            SqlDataReader clientReader = custCommand.ExecuteReader();
+                            clientReader.Read();
+                            string clientID = "";
+                            if (clientReader.HasRows)
+                            {
+                                clientID = clientReader[0].ToString();
+                            }
+                            clientReader.Close();
+                            //need to figure out what to do it client is not found
+
+                            SqlParameter rc = new SqlParameter();
+                            rc.ParameterName = "@RC";
+                            rc.Value = "";
+                            custCommand.Parameters.Add(rc);
+
+                            custstring = "EXECUTE @RC = [dbo].[pos_AddCredit_InvoiceCredit]" + invtot + ", \'\'  ,4  ," + clientID + ",-1  ," + invString + ",-1 ";
+                            custCommand.CommandText = custstring;
+                            if (custCommand.ExecuteNonQuery() == 0)
+                            {
+                                LogEntry("Credit Not Created for Client:" + clientID, "fail");
+                            }
+
+                            string creditid = rc.Value.ToString();
+
+                            // we need to get this invoice number
+                            SellCatListing(catTgid);
+                            string invnum = catInvString;
+                            custCommand.CommandText = "Update invoice set  ticket_request_id = " + trid + " where invoice_id = " + catInvString;
+                            custCommand.ExecuteNonQuery();
+
+                            string paystring = "Execute [dbo].[invoice_payment_insert]  2," + invnum + ",NULL  ,17 ," + invtot + ",\'n/a\'  ,\'n/a\'  ,\'n/a\'  ,NULL  ,NULL  ,12  ,1 ,1  , \'" + DateTime.Now + "\'";
+
+                            custCommand.CommandText = paystring;
+                            custCommand.ExecuteNonQuery();
+
+                            custstring = "update invoice_credit  set available_for_use = 0,system_user_id =12 where credit_id =" + creditid;
+                            custCommand.CommandText = custstring;
+                            custCommand.ExecuteNonQuery();
+
+                           /* custCommand.CommandText = "Select invoice_id from invoice where ticket_request_id = " + trid;
+                            SqlDataReader invreader = custCommand.ExecuteReader();
+                            invreader.Read();
+                            if (invreader.HasRows)
+                            {
+                                invnum = invreader[0].ToString();
+                                invreader.Close();
+                                if(invnum.Length > 0)
+                                {
+                                    string paystring = "Execute [dbo].[invoice_payment_insert]  \'" + DateTime.Now + "\',2  ," + invnum + ",NULL  ,17  ," + invtot + ",NULL  ,NULL  ,NULL  ,Null  ,NULL  ,12  ,1 ,1  , \'" + DateTime.Now + "\'";
+
+                                    custCommand.CommandText = paystring;
+                                    custCommand.ExecuteNonQuery();
+
+                                    custstring = "update invoice_credit  set available_for_use = 0,system_user_id =12 where credit_id =" + rc.Value.ToString();
+                                    custCommand.CommandText = custstring;
+                                    custCommand.ExecuteNonQuery();
+                                }
+                                else
+                                {
+                                    LogEntry("Cat Invoice not found - Credit not applied TRID:" + trid, "fail");
+                                }
+
+                            }
+                            else
+                            {
+                                LogEntry("Cat Invoice not found - Credit not applied TRID:" + trid, "fail");
+                            }
+                            */
+
+                            
+
+                        }
+                        else
+                        {
+                            LogEntry("TicketRequestID not found", "fail");
+                        }
+
+
+
+
+
+                    } 
 
                 }
 
@@ -471,8 +604,9 @@ namespace SaleNotifier
             
         }
 
-        public static Boolean SellCatListing(string catListStr,bool merc = false)
+        public static void SellCatListing(string catListStr, bool merc = false)
         {
+            bool client = false;
 
             string getTixStr = "";
             if (merc)
@@ -495,25 +629,25 @@ namespace SaleNotifier
 
 
 
-          /* 
+            /* 
 
-            string shipStr = @"INSERT into dbo.shipping_tracking(shipping_tracking_number, shipped_on_date, arrived_on_date, estimated_arrival_date, estimated_ship_date, notes, shipping_account_type_id, shipping_account_number_id, shipping_account_delivery_method_id, shipping_tracking_status_id, shipping_tracking_cost, will_call_pickup_name, runner_id, delivered_datetime, shipment_signed_for, runner_delivered_shipment_on, isreturned, cod_label_tracking_number, marked_for_call, called_awaiting_shipment, isdrop, save_path, ftp_location, system_user_id)
- Values('', Getdate(), '1900-01-01 00:00:00.000', '1900-01-01 00:00:00.000', NULL, '', 4, NULL, 22, 1, 0.00, '', NULL, NULL, '-', NULL, 0, NULL, 0, 0, 1, '', '', NULL); set @id = SCOPE_IDENTITY();";
-            SqlCommand shipInsert = new SqlCommand();
-            shipInsert.Connection = connection;
-            connection.Open();
-            shipInsert.CommandText = shipStr;
-            SqlParameter id = new SqlParameter();
-            id.SqlDbType = System.Data.SqlDbType.Int;
-            id.ParameterName = "@id";
-            id.Value = 0;
-            id.Direction = System.Data.ParameterDirection.Output;
+              string shipStr = @"INSERT into dbo.shipping_tracking(shipping_tracking_number, shipped_on_date, arrived_on_date, estimated_arrival_date, estimated_ship_date, notes, shipping_account_type_id, shipping_account_number_id, shipping_account_delivery_method_id, shipping_tracking_status_id, shipping_tracking_cost, will_call_pickup_name, runner_id, delivered_datetime, shipment_signed_for, runner_delivered_shipment_on, isreturned, cod_label_tracking_number, marked_for_call, called_awaiting_shipment, isdrop, save_path, ftp_location, system_user_id)
+   Values('', Getdate(), '1900-01-01 00:00:00.000', '1900-01-01 00:00:00.000', NULL, '', 4, NULL, 22, 1, 0.00, '', NULL, NULL, '-', NULL, 0, NULL, 0, 0, 1, '', '', NULL); set @id = SCOPE_IDENTITY();";
+              SqlCommand shipInsert = new SqlCommand();
+              shipInsert.Connection = connection;
+              connection.Open();
+              shipInsert.CommandText = shipStr;
+              SqlParameter id = new SqlParameter();
+              id.SqlDbType = System.Data.SqlDbType.Int;
+              id.ParameterName = "@id";
+              id.Value = 0;
+              id.Direction = System.Data.ParameterDirection.Output;
 
 
-            shipInsert.Parameters.Add(id);
-            shipInsert.ExecuteNonQuery();
-            string shipnum = id.Value.ToString();
-*/
+              shipInsert.Parameters.Add(id);
+              shipInsert.ExecuteNonQuery();
+              string shipnum = id.Value.ToString();
+  */
 
             string orderString = "Select [external_po_number],[client_broker_id] from dbo.purchase_Order where purchase_order_id = " + poidString;
             SqlCommand ordCommand = new SqlCommand();
@@ -525,7 +659,7 @@ namespace SaleNotifier
             string extpo = "";
 
 
-            string cbinvoice = "SELECT [invoice_id],[client_broker_id],[client_broker_employee_id] FROM [dbo].[client_broker_invoice]  where invoice_id =" + invString;
+
 
             if (ordreader.HasRows)
             {
@@ -535,7 +669,9 @@ namespace SaleNotifier
             }
             connection.Close();
             ordreader.Close();
-            ordCommand.CommandText = cbinvoice;            
+
+            string cbinvoice = "SELECT [invoice_id],[client_broker_id],[client_broker_employee_id] FROM [dbo].[client_broker_invoice]  where invoice_id =" + invString;
+            ordCommand.CommandText = cbinvoice;
             connection.Open();
             ordreader = ordCommand.ExecuteReader();
 
@@ -564,6 +700,39 @@ namespace SaleNotifier
 
 
                 brokerCon.Close();
+            }
+            else //might be customer order - look for client_address
+            {
+                ordreader.Close();
+                cbinvoice = "SELECT [invoice_id],[client_id] FROM [dbo].[client_invoice]  where invoice_id =" + invString;
+                ordCommand.CommandText = cbinvoice;
+                // connection.Open();
+                ordreader = ordCommand.ExecuteReader();
+                //get client address
+                if (ordreader.HasRows)
+                {
+                    ordreader.Read();
+
+                    brokerNum = Int32.Parse(ordreader[1].ToString());
+                    string brokerString = "Select address_id from dbo.client_address where client_id = " + brokerNum;
+                    SqlCommand brokerCommand = new SqlCommand();
+                    SqlConnection brokerCon = new SqlConnection(connectionString);
+                    brokerCommand.Connection = brokerCon;
+                    brokerCommand.CommandText = brokerString;
+                    brokerCon.Open();
+                    SqlDataReader brokerReader = brokerCommand.ExecuteReader();
+
+                    if (brokerReader.HasRows)
+                    {
+                        brokerReader.Read();
+                        addressid = brokerReader[0].ToString();
+                        client = true;
+
+                    }
+
+
+                    brokerCon.Close();
+                }
             }
 
 
@@ -602,7 +771,7 @@ namespace SaleNotifier
             rtix.Columns.Add(column);
 
             column = new DataColumn();
-            column.DataType = System.Type.GetType("System.Single"); 
+            column.DataType = System.Type.GetType("System.Single");
             column.ColumnName = "actual_sold_price";
             column.ReadOnly = true;
             column.Unique = true;
@@ -611,10 +780,31 @@ namespace SaleNotifier
 
 
             //==========================================
+            string invstr;
+            if (client) // put brokernum in param client_id rather than client_broker_id
+            {
 
+                //get expenses from consign invoice to place in cat invoice
+                string invSQL = "Select  [invoice_total_expense],[invoice_total_shipping_cost],[invoice_total_taxes] from dbo.invoice where invoice_id = " + invString;
+                SqlCommand invCommand = new SqlCommand();
+                SqlConnection invCon = new SqlConnection(connectionString);
+                invCommand.Connection = invCon;
+                invCommand.CommandText = invSQL;
+                invCon.Open();
+                SqlDataReader invReader = invCommand.ExecuteReader();
 
-            string invstr = "execute [dbo].[api_invoice_create] " + "\'\'" + ",NULL,24,null,4,null,null," + brokerNum + "," + addressid+ ",0,0,0,4," + "\'" + invNotes + "\',\'\',\'" + extpoString + "\',5,1,1,\'\',@realtix,@tix,1,0,0,0";
+                invReader.Read();
+                string expense = invReader[0].ToString();
+                string ship = invReader[1].ToString();
+                string tax = invReader[2].ToString();
 
+               
+
+                invstr = "execute [dbo].[api_invoice_create] " + "\'\'" + ",NULL,22,null,4,null," + brokerNum + ",null," + addressid + "," + expense + "," + ship + "," + tax + ",4," + "\'" + invNotes + "\',\'\',\'" + extpoString + "\',5,1,1,\'\',@realtix,@tix,1,0,0,0";
+            }
+            else { 
+            invstr = "execute [dbo].[api_invoice_create] " + "\'\'" + ",NULL,22,null,4,null,null," + brokerNum + "," + addressid + ",0,0,0,4," + "\'" + invNotes + "\',\'\',\'" + extpoString + "\',5,1,1,\'\',@realtix,@tix,1,0,0,0";
+        }
             SqlParameter rtixParm = new SqlParameter();
             rtixParm.ParameterName = "@tix";
             rtixParm.Value = tix;
@@ -633,11 +823,38 @@ namespace SaleNotifier
             invInsert.CommandText = invstr;
             invInsert.Parameters.Add(tixParm);
             invInsert.Parameters.Add(rtixParm);
-            string retval;
-            retval = invInsert.ExecuteScalar().ToString();
+
+
+            //new section - we need inv # returned to customer order so we can disburse credit
+            if (client)
+            {
+                string retval;
+                SqlDataReader invReader = invInsert.ExecuteReader();
+                invReader.Read();
+                if (invReader.HasRows)
+                {
+                   // string test = invReader[0].ToString();
+                    invReader.NextResult(); //first result set is status and message - second is created invoice info
+                    invReader.Read();
+                    catInvString = invReader[0].ToString();
+                }
+                connection.Close();
+                string expensestr = "Insert Into  [dbo].[invoice_expenses] SELECT  [expense_amt],[expense_desc] ,[expense_type_id],[account_id] ," + catInvString + ",[notes]  FROM [dbo].[invoice_expenses] where invoice_id =" + invString;
+                SqlCommand expInsert = new SqlCommand();
+                expInsert.Connection = connection;
+                connection.Open();
+                expInsert.CommandText = expensestr;
+                expInsert.ExecuteScalar();
+                
+            }
+            else
+            {
+                invInsert.ExecuteScalar();
+            }
             connection.Close();
-            
-            return false;
+            LogEntry("Cat Sold " , "success");
+          // return retval;
+            //return false; 
         }
 
 
@@ -731,7 +948,8 @@ namespace SaleNotifier
             float price = (float.Parse(specReader[15].ToString()) / qty );
             priceString = price.ToString();
             extpoString = specReader[1].ToString();
-            string clientBroker = specReader[2].ToString();
+            //we are using getConsigncost process to set broker so we don't need an extra lookup here
+            //string clientBroker = ""; // specReader[2].ToString();
 
             /*
             string specRecord = @"INSERT INTO [dbo].[SpecSales]
@@ -746,7 +964,7 @@ namespace SaleNotifier
             string specRecord = @"INSERT INTO [dbo].[SpecSales]
                                             ([Ticket_group_id],[invoice_id],[purchase_order_id],[Ordernum],[ExternalPO],[EventName],[EventDate],[VenueName],[State],[City],[Quantity],[Section],[Row],[SalePrice],[OrderTotal],[SaleDate],[filled],[shipped],[assigned],[soldto])
                                             VALUES
-                                            (" + tgidString + "," + invString + "," + poidString + ",\'" + specReader[0].ToString() + "\',\'" + specReader[1].ToString() + "\',\'" + eventString + "\',\'" + specReader[4].ToString() + "\',\'" + venueString + "\',\'" + "\',\'\',\'" + soldString + "\',\'" + specReader[10].ToString() + "\',\'" + specReader[9].ToString() + "\',\'" + specReader[8].ToString() + "\',\'" + specReader[15].ToString() + "\',\'" + specReader[17].ToString() + "\'" + ",null,null,null," + clientBroker + ")";
+                                            (" + tgidString + "," + invString + "," + poidString + ",\'" + specReader[0].ToString() + "\',\'" + specReader[1].ToString() + "\',\'" + eventString + "\',\'" + specReader[4].ToString() + "\',\'" + venueString + "\',\'" + "\',\'\',\'" + soldString + "\',\'" + specReader[10].ToString() + "\',\'" + specReader[9].ToString() + "\',\'" + specReader[8].ToString() + "\',\'" + specReader[15].ToString() + "\',\'" + specReader[17].ToString() + "\'" + ",null,null,null,null"  + ")";
 
 
 

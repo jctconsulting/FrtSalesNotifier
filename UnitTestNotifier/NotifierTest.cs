@@ -27,6 +27,12 @@ namespace UnitTestNotifier
 
         }
 
+        public void CreateCat()
+        {
+            string soldtg = ""; // put sold listing tgid here
+            Program.CreateCatListing(soldtg);
+        }
+
 
     }
 }
