@@ -466,9 +466,11 @@ namespace SaleNotifier
                         // get ticket request id before we void 
                         string trid = "";
                         string invtot = "";
+                        string expense = "";
+                        string ship = "";
                         SqlConnection trcon = new SqlConnection(ConfigurationManager.ConnectionStrings["indux"].ConnectionString);
                         trcon.Open();
-                        string trstring  = "Select ticket_request_id,invoice_total from invoice where invoice_id = " + invString;
+                        string trstring  = "Select ticket_request_id,invoice_total,invoice_total_expense,invoice_total_shipping_cost from invoice where invoice_id = " + invString;
                         SqlCommand trcommand = new SqlCommand();
                         trcommand.Connection = trcon;
                         trcommand.CommandText = trstring;
@@ -478,6 +480,8 @@ namespace SaleNotifier
                         {
                             trid = trreader[0].ToString();
                             invtot = trreader[1].ToString();
+                            expense = trreader[2].ToString();
+                            ship = trreader[3].ToString();
                         }
                         trcon.Close();
                         // we can only void and so forth if we can attach trid to new invoice
@@ -518,6 +522,8 @@ namespace SaleNotifier
                             rc.Value = "";
                             custCommand.Parameters.Add(rc);
 
+                          //  float subtotal = float.Parse(invtot) - float.Parse(expense) - float.Parse(ship);
+
                             custstring = "EXECUTE @RC = [dbo].[pos_AddCredit_InvoiceCredit]" + invtot + ", \'\'  ,4  ," + clientID + ",-1  ," + invString + ",-1 ";
                             custCommand.CommandText = custstring;
                             if (custCommand.ExecuteNonQuery() == 0)
@@ -533,12 +539,12 @@ namespace SaleNotifier
                             custCommand.CommandText = "Update invoice set  ticket_request_id = " + trid + " where invoice_id = " + catInvString;
                             custCommand.ExecuteNonQuery();
 
-                            string paystring = "Execute [dbo].[invoice_payment_insert]  2," + invnum + ",NULL  ,17 ," + invtot + ",\'n/a\'  ,\'n/a\'  ,\'n/a\'  ,NULL  ,NULL  ,12  ,1 ,1  , \'" + DateTime.Now + "\'";
+                            string paystring = "Execute [dbo].[invoice_payment_insert]  2," + invnum + ",NULL  ,17 ," + invtot+ ",\'n/a\'  ,\'n/a\'  ,\'n/a\'  ,NULL  ,NULL  ,12  ,1 ,1  , \'" + DateTime.Now + "\'";
 
                             custCommand.CommandText = paystring;
                             custCommand.ExecuteNonQuery();
 
-                            custstring = "update invoice_credit  set available_for_use = 0,system_user_id =12 where credit_id =" + creditid;
+                            custstring = "update invoice_credit  set available_for_use = 0,system_user_id =12 where invoice_id =" + invnum;
                             custCommand.CommandText = custstring;
                             custCommand.ExecuteNonQuery();
 
@@ -608,24 +614,10 @@ namespace SaleNotifier
         {
             bool client = false;
 
-            string getTixStr = "";
-            if (merc)
-            {
-                getTixStr = "Select [category_ticket_id],0,0,0 from Category_ticket where category_ticket_group_id = " + catListStr;
-            }
-
-            else
-            {
-                getTixStr = "Select [category_ticket_id],0,0," + priceString + " from Category_ticket where category_ticket_group_id = " + catListStr;
-            }
+            //========================old get tickets location=============================
             string connectionString = ConfigurationManager.ConnectionStrings["indux"].ConnectionString;
             SqlConnection connection = new SqlConnection(connectionString);
-            SqlCommand Command = new SqlCommand();
-            Command.Connection = connection;
-            Command.CommandText = getTixStr;
-            SqlDataAdapter da = new SqlDataAdapter(Command);
-            DataTable tix = new DataTable();
-            da.Fill(tix);
+            //===============================================================================
 
 
 
@@ -734,7 +726,7 @@ namespace SaleNotifier
                     brokerCon.Close();
                 }
             }
-
+           
 
             string invNotes = "Romans";
             // empty table for invoice tix
@@ -781,6 +773,9 @@ namespace SaleNotifier
 
             //==========================================
             string invstr;
+            string expense = "0";
+            string ship = "0";
+            string tax = "0";
             if (client) // put brokernum in param client_id rather than client_broker_id
             {
 
@@ -794,9 +789,9 @@ namespace SaleNotifier
                 SqlDataReader invReader = invCommand.ExecuteReader();
 
                 invReader.Read();
-                string expense = invReader[0].ToString();
-                string ship = invReader[1].ToString();
-                string tax = invReader[2].ToString();
+                expense = invReader[0].ToString();
+                ship = invReader[1].ToString();
+                tax = invReader[2].ToString();
 
                
 
@@ -805,6 +800,43 @@ namespace SaleNotifier
             else { 
             invstr = "execute [dbo].[api_invoice_create] " + "\'\'" + ",NULL,22,null,4,null,null," + brokerNum + "," + addressid + ",0,0,0,4," + "\'" + invNotes + "\',\'\',\'" + extpoString + "\',5,1,1,\'\',@realtix,@tix,1,0,0,0";
         }
+
+
+            //new place for getting tickets=======================================================
+            string getTixStr = "";
+            if (merc)
+            {
+                getTixStr = "Select [category_ticket_id],0,0,0 from Category_ticket where category_ticket_group_id = " + catListStr;
+            }
+
+            else
+            {
+                string ticketprice = priceString;
+
+                if (client)
+                {
+                    // remove expenses from the unit ticket price so we can add them back on the invoice
+                    int qtytix = Int32.Parse(soldString);
+                    float tixprice = (float.Parse(priceString) ) - (float.Parse(expense) / qtytix) - (float.Parse(ship) / qtytix) - (float.Parse(tax) / qtytix);
+                    ticketprice = tixprice.ToString();
+
+                }
+                
+                getTixStr = "Select [category_ticket_id],0,0," + ticketprice + " from Category_ticket where category_ticket_group_id = " + catListStr;
+            }
+            string tixconnectionString = ConfigurationManager.ConnectionStrings["indux"].ConnectionString;
+            SqlConnection tixconnection = new SqlConnection(tixconnectionString);
+            SqlCommand Command = new SqlCommand();
+            Command.Connection = tixconnection;
+            Command.CommandText = getTixStr;
+            SqlDataAdapter da = new SqlDataAdapter(Command);
+            DataTable tix = new DataTable();
+            tixconnection.Open();
+            da.Fill(tix);
+
+
+
+            //========================================================================
             SqlParameter rtixParm = new SqlParameter();
             rtixParm.ParameterName = "@tix";
             rtixParm.Value = tix;
@@ -845,12 +877,20 @@ namespace SaleNotifier
                 connection.Open();
                 expInsert.CommandText = expensestr;
                 expInsert.ExecuteScalar();
+
+                float total = float.Parse(priceString) * float.Parse(soldString)  ;
+                SqlCommand updInvoice = new SqlCommand();
+                updInvoice.Connection = connection;
+                updInvoice.CommandText = "Update invoice set invoice_total = " + total.ToString() + "where invoice_id = " + catInvString;
+                updInvoice.ExecuteNonQuery();
+
                 
             }
             else
             {
                 invInsert.ExecuteScalar();
             }
+            tixconnection.Close();
             connection.Close();
             LogEntry("Cat Sold " , "success");
           // return retval;
