@@ -36,3 +36,5 @@ C:\Users\Administrator.JCT-MPSTUDIO\Documents\Source\Repos\salesnotifier\SaleNot
 C:\Users\Administrator.JCT-MPSTUDIO\Documents\Source\Repos\salesnotifier\SaleNotifier\obj\Debug\SaleNotifier.csproj.CopyComplete
 C:\Users\rich\Documents\Source\Repos\SalesNofifier\salesnotifier\SaleNotifier\obj\Debug\SaleNotifier.csprojAssemblyReference.cache
 C:\Users\rich\Documents\Source\Repos\SalesNofifier\salesnotifier\SaleNotifier\obj\Debug\SaleNotifier.csproj.CopyComplete
+C:\Users\rich\Documents\Source\Repos\SalesNofifier\salesnotifier\SaleNotifier\bin\Debug\RestSharp.dll
+C:\Users\rich\Documents\Source\Repos\SalesNofifier\salesnotifier\SaleNotifier\bin\Debug\RestSharp.xml

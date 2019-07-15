@@ -11,6 +11,8 @@ using System.Diagnostics;
 using System.Runtime.Serialization;
 using Newtonsoft.Json;
 using System.Configuration;
+using System.Net.Mail;
+using RestSharp;
 
 namespace SaleNotifier
 {
@@ -27,6 +29,33 @@ namespace SaleNotifier
         public static int brokerNum;
         public static bool tntrans;
 
+        public class specListing
+        {
+
+            String id { get; set; }
+            int ticketGroupId { get; set; }
+            String floor { get; set; }
+            String section { get; set; }
+            String startRow { get; set; }
+            String row { get; set; }
+            int quantity { get; set; }
+            float lowerPrice { get; set; }
+            float price { get; set; }
+            float extraFee { get; set; }
+            public float priceMultiplier { get; set; }
+            int rulePriceMultiplierIndex { get; set; }
+            String offerId { get; set; }
+            String status { get; set; }
+            String creationType { get; set; }
+            String creationDate { get; set; }
+            String statusChangeDate { get; set; }
+            String pricingRuleMultiplierChangeTime { get; set; }
+            String eventId { get; set; }
+            String eventName { get; set; }
+            String venueName { get; set; }
+            String inconsistencyReason { get; set; }
+        }
+
 
 
 
@@ -35,7 +64,16 @@ namespace SaleNotifier
         {
 
             //test  -   CreateCatListing("121783");
-            
+
+            //[Logdate],[Level],[message],[type],[start_time],[end_time]
+            string specLogString = ConfigurationManager.ConnectionStrings["TicketTracker"].ConnectionString;
+            SqlConnection specLogConnection = new SqlConnection(specLogString);
+            specLogConnection.Open();
+            SqlCommand logCommand = new SqlCommand();
+            logCommand.Connection = specLogConnection;
+            logCommand.CommandText = "Insert into status_logs([Logdate] ,[Level],[message] ,[type])   values(Getdate(),'info','Notifier Start','success') ";
+            logCommand.ExecuteNonQuery();
+            specLogConnection.Close();
 
             // we will want to add a time interval qualifier to invoice date after testing is done
             string sqlstr = "SELECT dbo.ticket_group.ticket_group_id, dbo.invoice.invoice_id, COUNT(*) AS numsold,ticket.purchase_order_id FROM dbo.invoice INNER JOIN dbo.ticket ON dbo.invoice.invoice_id = dbo.ticket.invoice_id INNER JOIN dbo.ticket_group ON dbo.ticket.ticket_group_id = dbo.ticket_group.ticket_group_id WHERE (dbo.ticket_group.internal_notes LIKE \'%Romans%\') or (dbo.ticket_group.internal_notes LIKE \'FRT-Unbroadcast%\') GROUP BY dbo.ticket_group.ticket_group_id, dbo.invoice.invoice_id,ticket.purchase_order_id";
@@ -47,7 +85,7 @@ namespace SaleNotifier
             SqlCommand command = new SqlCommand();
             command.Connection = connection;
             command.CommandText = sqlstr;
-            
+
 
 
             connection.Open();
@@ -76,17 +114,17 @@ namespace SaleNotifier
 
 
                     // Make a REST post to Spec here - 
-                    Console.WriteLine( reader[0].ToString(), reader[1].ToString());
-                    Uri endpoint = new Uri("https://spec.pokemonion.com/listings/consignment/sold");        
-                    string requeststr = "{\"ticketGroupId\":\"" + tgidString + "\" ,\"soldQuantity\":" + soldString +"}";
+                    Console.WriteLine(reader[0].ToString(), reader[1].ToString());
+                    Uri endpoint = new Uri("https://spec.pokemonion.com/listings/consignment/sold");
+                    string requeststr = "{\"ticketGroupId\":\"" + tgidString + "\" ,\"soldQuantity\":" + soldString + "}";
                     statusflag = false; //false -production
                     if (!notified)
                     {
                         GetPOSTResponse(endpoint, requeststr);
                     }
-                    
-                    if (statusflag){
-                      
+
+                    if (statusflag) {
+
                         //unbroadcast listing to avoid double sale if void process doesn't execute properly (or we have a customer order)
                         ProcessStartInfo startInfo = new ProcessStartInfo();
                         startInfo.CreateNoWindow = true;
@@ -95,7 +133,7 @@ namespace SaleNotifier
                         startInfo.WindowStyle = ProcessWindowStyle.Hidden;
                         startInfo.Arguments = reader[0].ToString();
                         Process.Start(startInfo);
-                                                                    
+
                         tntrans = false;
                         tntrans = checkTransactionType(Int32.Parse(tgidString));
 
@@ -105,12 +143,12 @@ namespace SaleNotifier
                             //Create cat even if we aren't reversing inv/po out - but don't do listing has already been processed
                             CreateCatListing(reader[0].ToString());
                         }
-                        
-                        
+
+
                         if (!tntrans)
                         {
                             // Don't void PO if invoice fails to void - creates orphaned invoice
-                            if (VoidInvoice(Int32.Parse(invString))==0)
+                            if (VoidInvoice(Int32.Parse(invString)) == 0)
                             {
                                 VoidPO(Int32.Parse(poidString));
                             }
@@ -123,7 +161,7 @@ namespace SaleNotifier
                         {
                             LogEntry("Tnet Transaction - Nothing Voided", "warn");
                         }
-                       
+
 
                     }
                     else
@@ -136,19 +174,27 @@ namespace SaleNotifier
                     }
                 }
             }
-            else 
+            else
             {
                 Console.WriteLine("No rows found.");
                 Environment.Exit(1);
             }
             reader.Close();
+            specLogString = ConfigurationManager.ConnectionStrings["TicketTracker"].ConnectionString;
+            specLogConnection = new SqlConnection(specLogString);
+            specLogConnection.Open();
+            logCommand = new SqlCommand();
+            logCommand.Connection = specLogConnection;
+            logCommand.CommandText = "Insert into status_logs([Logdate] ,[Level],[message] ,[type])   values(Getdate(),'info','Notifier Finish','success') ";
+            logCommand.ExecuteNonQuery();
+            specLogConnection.Close();
             Environment.Exit(0);
 
 
         }
 
-        
-      
+
+
         public static void GetPOSTResponse(Uri uri, string data)
         {
             HttpWebRequest request = (HttpWebRequest)HttpWebRequest.Create(uri);
@@ -169,10 +215,10 @@ namespace SaleNotifier
             }
             try
             {
-                HttpWebResponse response= (HttpWebResponse)request.GetResponse();
+                HttpWebResponse response = (HttpWebResponse)request.GetResponse();
                 Stream responseStream = response.GetResponseStream();
-           
-                if ((response.StatusCode == HttpStatusCode.OK) ||  (response.StatusCode == HttpStatusCode.Accepted))
+
+                if ((response.StatusCode == HttpStatusCode.OK) || (response.StatusCode == HttpStatusCode.Accepted))
                 {
                     statusflag = true;
                 }
@@ -182,27 +228,27 @@ namespace SaleNotifier
                 }
 
 
-              //  statusflag = msg.status;
+                //  statusflag = msg.status;
                 response.Close();
             }
             catch
             {
                 Console.WriteLine("Post Failed");
-                
+
             }
 
 
         }
         public static int VoidInvoice(int invoiceid)
         {
-          
-            string invconnectionString = ConfigurationManager.ConnectionStrings["indux"].ConnectionString;            
+
+            string invconnectionString = ConfigurationManager.ConnectionStrings["indux"].ConnectionString;
             SqlConnection invconnection = new SqlConnection(invconnectionString);
             invconnection.Open();
 
-            
 
-            string invsqlstring = "DECLARE @RC int EXECUTE @RC = [dbo].[pos_invoice_void] " + invoiceid + ",0,0,0,\'Romans\',1"; 
+
+            string invsqlstring = "DECLARE @RC int EXECUTE @RC = [dbo].[pos_invoice_void] " + invoiceid + ",0,0,0,\'Romans\',1";
             SqlCommand catlistCommand = new SqlCommand();
             catlistCommand.Connection = invconnection;
             catlistCommand.CommandText = invsqlstring;
@@ -210,9 +256,9 @@ namespace SaleNotifier
             {
                 catlistCommand.ExecuteScalar();
             }
-            catch(Exception ex)
+            catch (Exception ex)
             {
-                LogEntry("Invoice Void Failed:" + ex.Message , "fail");
+                LogEntry("Invoice Void Failed:" + ex.Message, "fail");
                 invconnection.Close();
                 return 1;
             }
@@ -227,9 +273,9 @@ namespace SaleNotifier
         {
 
             // call purchase_order_void_po
-            
+
             string voidString = ConfigurationManager.ConnectionStrings["indux"].ConnectionString;
-            
+
             SqlConnection voidCon = new SqlConnection(voidString);
             voidCon.Open();
             SqlCommand voidCom = new SqlCommand();
@@ -237,12 +283,12 @@ namespace SaleNotifier
             voidCom.CommandText = "declare @RC int Execute @RC = [dbo].[purchase_order_void_po] " + poid + ",1,6"; //tranofficeid,sysuserid
             try
             {
-                voidCom.ExecuteScalar();                
+                voidCom.ExecuteScalar();
                 LogEntry("PO Voided", "success");
                 voidCon.Close();
                 return 0;
             }
-            catch(Exception ex)
+            catch (Exception ex)
             {
                 LogEntry("PO not voided:" + ex.Message, "fail");
                 voidCon.Close();
@@ -250,18 +296,18 @@ namespace SaleNotifier
             }
 
 
-            
+
 
         }
 
         public static int CreateCatListing(string oldtg)
         {
-            int tgid=0;
+            int tgid = 0;
             // GetTGInfo
 
-            string sqlstring =  "Select * from ticket_group where ticket_group_id = " + oldtg;
+            string sqlstring = "Select * from ticket_group where ticket_group_id = " + oldtg;
             string clconnectionString = ConfigurationManager.ConnectionStrings["indux"].ConnectionString;
-            
+
             SqlConnection clconnection = new SqlConnection(clconnectionString);
             SqlCommand command = new SqlCommand();
             command.Connection = clconnection;
@@ -270,14 +316,14 @@ namespace SaleNotifier
             SqlDataReader reader = command.ExecuteReader();
 
 
-            reader.Read();     
+            reader.Read();
             // get the event info we need
             SqlCommand eventCommand = new SqlCommand();
             eventCommand.Connection = clconnection;
             eventCommand.CommandText = "Select * from event where event_id = " + reader[14].ToString();
 
             String rowString = reader[9].ToString();
-            String sectionString =   reader[10].ToString();
+            String sectionString = reader[10].ToString();
             String seathighString = "0"; //reader[22].ToString();
             String seatlowString = "0"; //reader[23].ToString();
 
@@ -312,33 +358,34 @@ namespace SaleNotifier
             venueName = venueName.Replace("'", "''");
             venueReader.Close();
             //make CatListing
-          
-            string catsqlstring = "Declare @RC int EXECUTE @RC = [dbo].[api_category_ticket_group_create] " + exchangeEventId + ",\'" + /*eventName +*/ "\','" + eventDate + "\'," + venueId + ",\'" + venueName + "\',\'" + sectionString + "\',\'\',\'" + rowString + "\'," + "\'\'" + "," + seatlowString + "," + seathighString + "," + qtyString + "," + "0,0,0,0,\'" + onHand  + "\',\'Sale - RC\'," +"\'\'" +"," + "6," + "2," + localeventString;
 
-  
+            string catsqlstring = "Declare @RC int EXECUTE @RC = [dbo].[api_category_ticket_group_create] " + exchangeEventId + ",\'" + /*eventName +*/ "\','" + eventDate + "\'," + venueId + ",\'" + venueName + "\',\'" + sectionString + "\',\'\',\'" + rowString + "\'," + "\'\'" + "," + seatlowString + "," + seathighString + "," + qtyString + "," + "0,0,0,0,\'" + onHand + "\',\'Sale - RC\'," + "\'\'" + "," + "6," + "2," + localeventString;
+
+
 
             SqlCommand catlistCommand = new SqlCommand();
             catlistCommand.Connection = clconnection;
-            catlistCommand.CommandText =catsqlstring;
+            catlistCommand.CommandText = catsqlstring;
             try
             {
                 SqlDataReader catListingReader;
-                catListingReader=  catlistCommand.ExecuteReader();
+                catListingReader = catlistCommand.ExecuteReader();
                 catListingReader.Read();
                 string result = catListingReader[0].ToString();
                 string catTgid = catListingReader[2].ToString();
                 if (catTgid == "-1") //api function call failed - zoned event likely -> force it
                 {
+                    LogEntry("VC adding", "warn");
                     string vcInsertstr = @" INSERT dbo.venue_category (section_high , section_low, row_low , row_high, seat_low, seat_high, default_wholesale_price, default_retail_price, venue_id, default_cost, default_face_price, text_desc, show_to_sales_staff, default_ticket_group_notes, ticket_group_stock_type_id, ticket_group_type_id, venue_configuration_zone_id)
                                            VALUES ( '' , @section_low, @row_low, @row_high, '', '', 0.00, 0.00, @venue_id, 0.00, 0.00, '', 1, '', 1, 1, NULL );";
 
                     SqlCommand vcInsert = new SqlCommand();
                     SqlConnection vcCon = new SqlConnection(ConfigurationManager.ConnectionStrings["indux"].ConnectionString);
                     vcCon.Open();
-                    vcInsert.Connection =vcCon ; // clconnection;
+                    vcInsert.Connection = vcCon; // clconnection;
 
                     vcInsert.CommandText = vcInsertstr;
-             //       vcInsert.CommandType = System.Data.CommandType.StoredProcedure;
+                    //       vcInsert.CommandType = System.Data.CommandType.StoredProcedure;
 
                     SqlParameter section = new SqlParameter();
                     section.ParameterName = "@section_low";
@@ -361,14 +408,14 @@ namespace SaleNotifier
                     vcInsert.Parameters.Add(venue);
 
 
-               
+
                     vcInsert.ExecuteScalar();
                     vcCon.Close();
                     vcCon.Open();
                     //Make sure vconfig was inserted and get its id
                     SqlCommand vcCheck = new SqlCommand();
                     vcCheck.Connection = vcCon;
-                    vcCheck.CommandText = "SELECT * FROM dbo.venue_category vc	WHERE vc.venue_id = " + venueId + " AND vc.row_high = \'" +rowString + "\' AND vc.row_low = \'" + rowString+  "\' AND vc.section_low = \'" + sectionString + "\'" ;
+                    vcCheck.CommandText = "SELECT * FROM dbo.venue_category vc	WHERE vc.venue_id = " + venueId + " AND vc.row_high = \'" + rowString + "\' AND vc.row_low = \'" + rowString + "\' AND vc.section_low = \'" + sectionString + "\'";
                     SqlDataReader vcReader = vcCheck.ExecuteReader();
                     vcReader.Read();
                     if (vcReader.HasRows)
@@ -407,24 +454,24 @@ namespace SaleNotifier
                         catTgid = directCat.ExecuteScalar().ToString();
                         if (Int32.Parse(catTgid) > 0)
                         {
-                            for (int i = 1; i < Int32.Parse(qtyString)+1; i++)
+                            for (int i = 1; i < Int32.Parse(qtyString) + 1; i++)
                             {
                                 directCat.CommandText = "INSERT into dbo.category_ticket (category_ticket_group_id,position,actual_price,invoice_id,ticket_id,processed,system_user_id,exchange_request_id,fill_date) Values(" + catTgid + "," + i.ToString() + ",-1.00,NULL,NULL,0,NULL,NULL,NULL)";
                                 directCat.Parameters.Clear();
                                 directCat.ExecuteScalar();
 
                             }
-                        } 
+                        }
 
 
                         vcCon.Close();
                         fclCon.Close();
-                        
+
 
                     }
                     else
                     {
-                        LogEntry("Cat LIsting Not Created: VC not added" , "fail");
+                        LogEntry("Cat LIsting Not Created: VC not added", "fail");
                         vcCon.Close();
                         return 0;
                     }
@@ -470,7 +517,7 @@ namespace SaleNotifier
                         string ship = "";
                         SqlConnection trcon = new SqlConnection(ConfigurationManager.ConnectionStrings["indux"].ConnectionString);
                         trcon.Open();
-                        string trstring  = "Select ticket_request_id,invoice_total,invoice_total_expense,invoice_total_shipping_cost from invoice where invoice_id = " + invString;
+                        string trstring = "Select ticket_request_id,invoice_total,invoice_total_expense,invoice_total_shipping_cost from invoice where invoice_id = " + invString;
                         SqlCommand trcommand = new SqlCommand();
                         trcommand.Connection = trcon;
                         trcommand.CommandText = trstring;
@@ -485,9 +532,9 @@ namespace SaleNotifier
                         }
                         trcon.Close();
                         // we can only void and so forth if we can attach trid to new invoice
-                        if(trid.Length >0)
+                        if (trid.Length > 0)
                         {
-                            
+
 
 
                             if (VoidInvoice(Int32.Parse(invString)) == 0)
@@ -522,7 +569,7 @@ namespace SaleNotifier
                             rc.Value = "";
                             custCommand.Parameters.Add(rc);
 
-                          //  float subtotal = float.Parse(invtot) - float.Parse(expense) - float.Parse(ship);
+                            //  float subtotal = float.Parse(invtot) - float.Parse(expense) - float.Parse(ship);
 
                             custstring = "EXECUTE @RC = [dbo].[pos_AddCredit_InvoiceCredit]" + invtot + ", \'\'  ,4  ," + clientID + ",-1  ," + invString + ",-1 ";
                             custCommand.CommandText = custstring;
@@ -539,7 +586,7 @@ namespace SaleNotifier
                             custCommand.CommandText = "Update invoice set  ticket_request_id = " + trid + " where invoice_id = " + catInvString;
                             custCommand.ExecuteNonQuery();
 
-                            string paystring = "Execute [dbo].[invoice_payment_insert]  2," + invnum + ",NULL  ,17 ," + invtot+ ",\'n/a\'  ,\'n/a\'  ,\'n/a\'  ,NULL  ,NULL  ,12  ,1 ,1  , \'" + DateTime.Now + "\'";
+                            string paystring = "Execute [dbo].[invoice_payment_insert]  2," + invnum + ",NULL  ,17 ," + invtot + ",\'n/a\'  ,\'n/a\'  ,\'n/a\'  ,NULL  ,NULL  ,12  ,1 ,1  , \'" + DateTime.Now + "\'";
 
                             custCommand.CommandText = paystring;
                             custCommand.ExecuteNonQuery();
@@ -548,37 +595,37 @@ namespace SaleNotifier
                             custCommand.CommandText = custstring;
                             custCommand.ExecuteNonQuery();
 
-                           /* custCommand.CommandText = "Select invoice_id from invoice where ticket_request_id = " + trid;
-                            SqlDataReader invreader = custCommand.ExecuteReader();
-                            invreader.Read();
-                            if (invreader.HasRows)
-                            {
-                                invnum = invreader[0].ToString();
-                                invreader.Close();
-                                if(invnum.Length > 0)
-                                {
-                                    string paystring = "Execute [dbo].[invoice_payment_insert]  \'" + DateTime.Now + "\',2  ," + invnum + ",NULL  ,17  ," + invtot + ",NULL  ,NULL  ,NULL  ,Null  ,NULL  ,12  ,1 ,1  , \'" + DateTime.Now + "\'";
+                            /* custCommand.CommandText = "Select invoice_id from invoice where ticket_request_id = " + trid;
+                             SqlDataReader invreader = custCommand.ExecuteReader();
+                             invreader.Read();
+                             if (invreader.HasRows)
+                             {
+                                 invnum = invreader[0].ToString();
+                                 invreader.Close();
+                                 if(invnum.Length > 0)
+                                 {
+                                     string paystring = "Execute [dbo].[invoice_payment_insert]  \'" + DateTime.Now + "\',2  ," + invnum + ",NULL  ,17  ," + invtot + ",NULL  ,NULL  ,NULL  ,Null  ,NULL  ,12  ,1 ,1  , \'" + DateTime.Now + "\'";
 
-                                    custCommand.CommandText = paystring;
-                                    custCommand.ExecuteNonQuery();
+                                     custCommand.CommandText = paystring;
+                                     custCommand.ExecuteNonQuery();
 
-                                    custstring = "update invoice_credit  set available_for_use = 0,system_user_id =12 where credit_id =" + rc.Value.ToString();
-                                    custCommand.CommandText = custstring;
-                                    custCommand.ExecuteNonQuery();
-                                }
-                                else
-                                {
-                                    LogEntry("Cat Invoice not found - Credit not applied TRID:" + trid, "fail");
-                                }
+                                     custstring = "update invoice_credit  set available_for_use = 0,system_user_id =12 where credit_id =" + rc.Value.ToString();
+                                     custCommand.CommandText = custstring;
+                                     custCommand.ExecuteNonQuery();
+                                 }
+                                 else
+                                 {
+                                     LogEntry("Cat Invoice not found - Credit not applied TRID:" + trid, "fail");
+                                 }
 
-                            }
-                            else
-                            {
-                                LogEntry("Cat Invoice not found - Credit not applied TRID:" + trid, "fail");
-                            }
-                            */
+                             }
+                             else
+                             {
+                                 LogEntry("Cat Invoice not found - Credit not applied TRID:" + trid, "fail");
+                             }
+                             */
 
-                            
+
 
                         }
                         else
@@ -590,13 +637,13 @@ namespace SaleNotifier
 
 
 
-                    } 
+                    }
 
                 }
 
                 return Int32.Parse(catTgid);
             }
-            catch (Exception ex){
+            catch (Exception ex) {
 
                 LogEntry("Cat LIsting Creation Failed:" + ex.Message, "fail");
                 clconnection.Close();
@@ -607,7 +654,7 @@ namespace SaleNotifier
 
             // note should indicate this is a sale
 
-            
+
         }
 
         public static void SellCatListing(string catListStr, bool merc = false)
@@ -621,25 +668,7 @@ namespace SaleNotifier
 
 
 
-            /* 
 
-              string shipStr = @"INSERT into dbo.shipping_tracking(shipping_tracking_number, shipped_on_date, arrived_on_date, estimated_arrival_date, estimated_ship_date, notes, shipping_account_type_id, shipping_account_number_id, shipping_account_delivery_method_id, shipping_tracking_status_id, shipping_tracking_cost, will_call_pickup_name, runner_id, delivered_datetime, shipment_signed_for, runner_delivered_shipment_on, isreturned, cod_label_tracking_number, marked_for_call, called_awaiting_shipment, isdrop, save_path, ftp_location, system_user_id)
-   Values('', Getdate(), '1900-01-01 00:00:00.000', '1900-01-01 00:00:00.000', NULL, '', 4, NULL, 22, 1, 0.00, '', NULL, NULL, '-', NULL, 0, NULL, 0, 0, 1, '', '', NULL); set @id = SCOPE_IDENTITY();";
-              SqlCommand shipInsert = new SqlCommand();
-              shipInsert.Connection = connection;
-              connection.Open();
-              shipInsert.CommandText = shipStr;
-              SqlParameter id = new SqlParameter();
-              id.SqlDbType = System.Data.SqlDbType.Int;
-              id.ParameterName = "@id";
-              id.Value = 0;
-              id.Direction = System.Data.ParameterDirection.Output;
-
-
-              shipInsert.Parameters.Add(id);
-              shipInsert.ExecuteNonQuery();
-              string shipnum = id.Value.ToString();
-  */
 
             string orderString = "Select [external_po_number],[client_broker_id] from dbo.purchase_Order where purchase_order_id = " + poidString;
             SqlCommand ordCommand = new SqlCommand();
@@ -726,7 +755,7 @@ namespace SaleNotifier
                     brokerCon.Close();
                 }
             }
-           
+
 
             string invNotes = "Romans";
             // empty table for invoice tix
@@ -793,13 +822,13 @@ namespace SaleNotifier
                 ship = invReader[1].ToString();
                 tax = invReader[2].ToString();
 
-               
+
 
                 invstr = "execute [dbo].[api_invoice_create] " + "\'\'" + ",NULL,22,null,4,null," + brokerNum + ",null," + addressid + "," + expense + "," + ship + "," + tax + ",4," + "\'" + invNotes + "\',\'\',\'" + extpoString + "\',5,1,1,\'\',@realtix,@tix,1,0,0,0";
             }
-            else { 
-            invstr = "execute [dbo].[api_invoice_create] " + "\'\'" + ",NULL,22,null,4,null,null," + brokerNum + "," + addressid + ",0,0,0,4," + "\'" + invNotes + "\',\'\',\'" + extpoString + "\',5,1,1,\'\',@realtix,@tix,1,0,0,0";
-        }
+            else {
+                invstr = "execute [dbo].[api_invoice_create] " + "\'\'" + ",NULL,22,null,4,null,null," + brokerNum + "," + addressid + ",0,0,0,4," + "\'" + invNotes + "\',\'\',\'" + extpoString + "\',5,1,1,\'\',@realtix,@tix,1,0,0,0";
+            }
 
 
             //new place for getting tickets=======================================================
@@ -817,11 +846,11 @@ namespace SaleNotifier
                 {
                     // remove expenses from the unit ticket price so we can add them back on the invoice
                     int qtytix = Int32.Parse(soldString);
-                    float tixprice = (float.Parse(priceString) ) - (float.Parse(expense) / qtytix) - (float.Parse(ship) / qtytix) - (float.Parse(tax) / qtytix);
+                    float tixprice = (float.Parse(priceString)) - (float.Parse(expense) / qtytix) - (float.Parse(ship) / qtytix) - (float.Parse(tax) / qtytix);
                     ticketprice = tixprice.ToString();
 
                 }
-                
+
                 getTixStr = "Select [category_ticket_id],0,0," + ticketprice + " from Category_ticket where category_ticket_group_id = " + catListStr;
             }
             string tixconnectionString = ConfigurationManager.ConnectionStrings["indux"].ConnectionString;
@@ -856,7 +885,7 @@ namespace SaleNotifier
             invInsert.Parameters.Add(tixParm);
             invInsert.Parameters.Add(rtixParm);
 
-
+            string i = "";
             //new section - we need inv # returned to customer order so we can disburse credit
             if (client)
             {
@@ -865,7 +894,7 @@ namespace SaleNotifier
                 invReader.Read();
                 if (invReader.HasRows)
                 {
-                   // string test = invReader[0].ToString();
+                    // string test = invReader[0].ToString();
                     invReader.NextResult(); //first result set is status and message - second is created invoice info
                     invReader.Read();
                     catInvString = invReader[0].ToString();
@@ -878,22 +907,27 @@ namespace SaleNotifier
                 expInsert.CommandText = expensestr;
                 expInsert.ExecuteScalar();
 
-                float total = float.Parse(priceString) * float.Parse(soldString)  ;
+                float total = float.Parse(priceString) * float.Parse(soldString);
                 SqlCommand updInvoice = new SqlCommand();
                 updInvoice.Connection = connection;
                 updInvoice.CommandText = "Update invoice set invoice_total = " + total.ToString() + "where invoice_id = " + catInvString;
                 updInvoice.ExecuteNonQuery();
 
-                
+
             }
             else
             {
-                invInsert.ExecuteScalar();
+                i = invInsert.ExecuteScalar().ToString();
             }
             tixconnection.Close();
             connection.Close();
-            LogEntry("Cat Sold " , "success");
-          // return retval;
+            if (i.Length > 0)
+            {
+                if (i == "1") { LogEntry("Cat Sold ", "success"); }
+                else { LogEntry("Cat Invoice creation Failed ", "fail"); }
+            }
+            else { LogEntry("Cat Sold ", "success"); }
+            // return retval;
             //return false; 
         }
 
@@ -901,7 +935,7 @@ namespace SaleNotifier
         public static Boolean checkTransactionType(int TGID)
         {
             string connectionString = ConfigurationManager.ConnectionStrings["indux"].ConnectionString;
-          
+
             SqlConnection connection = new SqlConnection(connectionString);
             SqlCommand Command = new SqlCommand();
             Command.Connection = connection;
@@ -915,30 +949,35 @@ namespace SaleNotifier
                          ticket_group INNER JOIN
                          event ON ticket_group.event_id = event.event_id INNER JOIN
                          venue ON event.venue_id = venue.venue_id ON ticket.ticket_group_id = ticket_group.ticket_group_id
-              WHERE        (invoice.mercury_transaction_id is null) and   (invoice.external_PO not like '0') and  (invoice.external_PO not like 'n/a%') and ticket_group.ticket_group_id =";
+              WHERE        ((invoice.mercury_transaction_id is not null) or   (invoice.external_PO  like '0') or  (invoice.external_PO  like 'n/a%') or (invoice.external_PO is null)) and ticket_group.ticket_group_id =";
 
-            sqlstr = sqlstr + TGID.ToString(); 
+            sqlstr = sqlstr + TGID.ToString();
             Command.CommandText = sqlstr;
             connection.Open();
             SqlDataReader Reader = Command.ExecuteReader();
-           // string venueName = Reader[0].ToString();
+            // string venueName = Reader[0].ToString();
 
             if (Reader.HasRows)
             {
                 //this is a not tnet trans
                 connection.Close();
-                return false;
+                // return false;
+
+
+                // new sql returns tnet trans types
+                return true;
             }
             else
             {
-                
+
                 connection.Close();
-                return true;
+                // return true;
+                return false;
             }
-            
+
 
         }
-         public static void LogEntry(string message,string status)
+        public static void LogEntry(string message, string status)
         {
             string logString = ConfigurationManager.ConnectionStrings["TicketTracker"].ConnectionString;
             SqlConnection logConnection = new SqlConnection(logString);
@@ -985,7 +1024,7 @@ namespace SaleNotifier
             //use atif calc total div qty - account for takebacks from exchanges.
             int qty;
             Int32.TryParse(soldString, out qty);
-            float price = (float.Parse(specReader[15].ToString()) / qty );
+            float price = (float.Parse(specReader[15].ToString()) / qty);
             priceString = price.ToString();
             extpoString = specReader[1].ToString();
             //we are using getConsigncost process to set broker so we don't need an extra lookup here
@@ -1004,7 +1043,7 @@ namespace SaleNotifier
             string specRecord = @"INSERT INTO [dbo].[SpecSales]
                                             ([Ticket_group_id],[invoice_id],[purchase_order_id],[Ordernum],[ExternalPO],[EventName],[EventDate],[VenueName],[State],[City],[Quantity],[Section],[Row],[SalePrice],[OrderTotal],[SaleDate],[filled],[shipped],[assigned],[soldto])
                                             VALUES
-                                            (" + tgidString + "," + invString + "," + poidString + ",\'" + specReader[0].ToString() + "\',\'" + specReader[1].ToString() + "\',\'" + eventString + "\',\'" + specReader[4].ToString() + "\',\'" + venueString + "\',\'" + "\',\'\',\'" + soldString + "\',\'" + specReader[10].ToString() + "\',\'" + specReader[9].ToString() + "\',\'" + specReader[8].ToString() + "\',\'" + specReader[15].ToString() + "\',\'" + specReader[17].ToString() + "\'" + ",null,null,null,null"  + ")";
+                                            (" + tgidString + "," + invString + "," + poidString + ",\'" + specReader[0].ToString() + "\',\'" + specReader[1].ToString() + "\',\'" + eventString + "\',\'" + specReader[4].ToString() + "\',\'" + venueString + "\',\'" + "\',\'\',\'" + soldString + "\',\'" + specReader[10].ToString() + "\',\'" + specReader[9].ToString() + "\',\'" + specReader[8].ToString() + "\',\'" + specReader[15].ToString() + "\',\'" + specReader[17].ToString() + "\'" + ",null,null,null,null" + ")";
 
 
 
@@ -1013,10 +1052,78 @@ namespace SaleNotifier
             insSpecRecord.Connection = specSaleConnection;
             insSpecRecord.CommandText = specRecord;
             insSpecRecord.ExecuteNonQuery();
+
+            // send mail before speccon closes - we use specreader data
+            MailMessage mail = new MailMessage("jct@jct-tech.com", "frtspecsales@gmail.com");
+            SmtpClient client = new SmtpClient();
+            client.Port = 25;
+            client.DeliveryMethod = SmtpDeliveryMethod.Network;
+            client.UseDefaultCredentials = false;
+            client.Host = "10.10.25.187";
+            mail.Subject = "Incoming  Sale";
+            mail.Body = eventString + ":Event\n " + specReader[4].ToString() + ":Eventdate\n" + venueString + ":Venue\n " + soldString + ":Qty\n " + specReader[10].ToString() /*section*/ + ":Section\n " + specReader[9].ToString() /*row*/ + ":Row\n " + specReader[17].ToString() /*SaleDate*/;
+            client.Credentials = new NetworkCredential("jct", "Ma75nt7276");
+            client.Send(mail);
+
+
             specSaleConnection.Close();
             srconnection.Close();
+            GetPriceMultiplier(tgidString);
+
+
+
+        }
+
+        public static void GetPriceMultiplier(String TGID)
+        {
+
+
+            string ticketGroup = TGID;
+
+            string connectionString = ConfigurationManager.ConnectionStrings["TicketTracker"].ConnectionString;
+            SqlConnection connection = new SqlConnection(connectionString);
+            SqlCommand command = new SqlCommand();
+            command.Connection = connection;
+            command.CommandText = "Select * from SpecSales  where ticket_group_id = " + ticketGroup;
+
+
+
+            connection.Open();
+            SqlDataReader reader = command.ExecuteReader();
+
+            if (reader.HasRows)
+            {
+                reader.Read();
+                //for each record in spec sales - set price multiplier
+                ticketGroup = reader[0].ToString();
+                RestClient client = new RestClient("https://spec.pokemonion.com/listings/consignment/tgid/");
+                RestRequest request = new RestRequest(ticketGroup);
+                request.AddHeader("Authorization", "Basic c3BlYzptcDJ3ODRuUU05VlNOa1BK");
+                var response = client.Execute<specListing>(request);
+                if (response.StatusCode != HttpStatusCode.NotFound)
+                {
+                    specListing listing = response.Data;
+                    SqlCommand command2 = new SqlCommand();
+                    command2.CommandText = "Update SpecSales Set priceMultiplier = " + listing.priceMultiplier.ToString() + " where ticket_group_id = " + ticketGroup;
+                    SqlConnection connection2 = new SqlConnection(connectionString);
+                    command2.Connection = connection2;
+                    connection2.Open();
+                    command2.ExecuteNonQuery();
+                    connection2.Close();
+                }
+
+
+
+            }
+            connection.Close();
         }
 
 
+
+        
+    
     }
+
+
 }
+

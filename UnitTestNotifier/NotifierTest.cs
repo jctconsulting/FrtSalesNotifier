@@ -10,7 +10,9 @@ namespace UnitTestNotifier
         [TestMethod]
         public void TestMethod1()
         {
-            string CattoSell = ""; //test cat tgid goes here
+            string CattoSell = "382077"; //test cat tgid goes here
+            Program.poidString = "211176";
+            Program.invString = "109502";
 
             Program.SellCatListing(CattoSell);
 
@@ -20,7 +22,7 @@ namespace UnitTestNotifier
         [TestMethod]
         public void TestAddSpec()
         {
-            Program.tgidString = ""; //test tgid goes here
+            Program.tgidString = "421195"; //test tgid goes here
 
             Program.AddSpecSale();
 
