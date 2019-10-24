@@ -330,6 +330,7 @@ namespace SaleNotifier
             String qtyString = soldString;//reader[4].ToString();
 
             String localeventString = reader[14].ToString();
+            String deliveryStr = reader[38].ToString();
 
 
             //  clconnection.Open();
@@ -359,7 +360,7 @@ namespace SaleNotifier
             venueReader.Close();
             //make CatListing
 
-            string catsqlstring = "Declare @RC int EXECUTE @RC = [dbo].[api_category_ticket_group_create] " + exchangeEventId + ",\'" + /*eventName +*/ "\','" + eventDate + "\'," + venueId + ",\'" + venueName + "\',\'" + sectionString + "\',\'\',\'" + rowString + "\'," + "\'\'" + "," + seatlowString + "," + seathighString + "," + qtyString + "," + "0,0,0,0,\'" + onHand + "\',\'Sale - RC\'," + "\'\'" + "," + "6," + "2," + localeventString;
+            string catsqlstring = "Declare @RC int EXECUTE @RC = [dbo].[api_category_ticket_group_create] " + exchangeEventId + ",\'" + /*eventName +*/ "\','" + eventDate + "\'," + venueId + ",\'" + venueName + "\',\'" + sectionString + "\',\'\',\'" + rowString + "\'," + "\'\'" + "," + seatlowString + "," + seathighString + "," + qtyString + "," + "0,0,0,0,\'" + onHand + "\',\'Sale - RC\'," + "\'\'" + "," + deliveryStr +"," + "2," + localeventString;
 
 
 
@@ -949,7 +950,7 @@ namespace SaleNotifier
                          ticket_group INNER JOIN
                          event ON ticket_group.event_id = event.event_id INNER JOIN
                          venue ON event.venue_id = venue.venue_id ON ticket.ticket_group_id = ticket_group.ticket_group_id
-              WHERE        ((invoice.mercury_transaction_id is not null) or   (invoice.external_PO  like '0') or  (invoice.external_PO  like 'n/a%') or (invoice.external_PO is null)) and ticket_group.ticket_group_id =";
+              WHERE        ((invoice.mercury_transaction_id is not null) or   (invoice.external_PO  like '0') or  (invoice.external_PO  like 'n/a%') or (invoice.external_PO is null) or (invoice.external_PO  like '') ) and ticket_group.ticket_group_id =";
 
             sqlstr = sqlstr + TGID.ToString();
             Command.CommandText = sqlstr;
