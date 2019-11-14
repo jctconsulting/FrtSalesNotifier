@@ -332,7 +332,8 @@ namespace SaleNotifier
             String localeventString = reader[14].ToString();
             String deliveryStr = reader[38].ToString();
 
-
+           
+             
             //  clconnection.Open();
             reader.Close();
             SqlDataReader eventReader = eventCommand.ExecuteReader();
@@ -358,9 +359,15 @@ namespace SaleNotifier
             // account for ' in venue name
             venueName = venueName.Replace("'", "''");
             venueReader.Close();
+
+            
             //make CatListing
 
-            string catsqlstring = "Declare @RC int EXECUTE @RC = [dbo].[api_category_ticket_group_create] " + exchangeEventId + ",\'" + /*eventName +*/ "\','" + eventDate + "\'," + venueId + ",\'" + venueName + "\',\'" + sectionString + "\',\'\',\'" + rowString + "\'," + "\'\'" + "," + seatlowString + "," + seathighString + "," + qtyString + "," + "0,0,0,0,\'" + onHand + "\',\'Sale - RC\'," + "\'\'" + "," + deliveryStr +"," + "2," + localeventString;
+
+            //removed 11-13 to match API update
+            // exchangeEventId + ",\'" + /*eventName +*/ "\','" + eventDate + "\'," + venueId + ",\'" + venueName + "\',\'" +
+
+            string catsqlstring = "Declare @RC int EXECUTE @RC = [dbo].[api_category_ticket_group_create] " + "\'" + sectionString + "\',\'\',\'" + rowString + "\'," + "\'\'" + "," + seatlowString + "," + seathighString + "," + qtyString + "," + "0,0,0,0,\'" + onHand + "\',\'Sale - RC\'," + "\'\'" + "," + deliveryStr +"," + "2," + localeventString;
 
 
 
