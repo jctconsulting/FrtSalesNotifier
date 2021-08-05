@@ -51,9 +51,11 @@ namespace SaleNotifier
             String statusChangeDate { get; set; }
             String pricingRuleMultiplierChangeTime { get; set; }
             String eventId { get; set; }
+            public String exchange { get; set; }
             String eventName { get; set; }
             String venueName { get; set; }
             String inconsistencyReason { get; set; }
+            
         }
 
 
@@ -967,10 +969,8 @@ namespace SaleNotifier
 
             if (Reader.HasRows)
             {
-                //this is a not tnet trans
-                connection.Close();
-                // return false;
-
+                
+                connection.Close();          
 
                 // new sql returns tnet trans types
                 return true;
@@ -1064,14 +1064,22 @@ namespace SaleNotifier
             // send mail before speccon closes - we use specreader data
             MailMessage mail = new MailMessage("jct@jct-tech.com", "frtspecsales@gmail.com");
             SmtpClient client = new SmtpClient();
-            client.Port = 25;
+            client.Port = 587;
             client.DeliveryMethod = SmtpDeliveryMethod.Network;
             client.UseDefaultCredentials = false;
-            client.Host = "10.10.25.187";
+            client.Host = "10.10.25.175";
             mail.Subject = "Incoming  Sale";
             mail.Body = eventString + ":Event\n " + specReader[4].ToString() + ":Eventdate\n" + venueString + ":Venue\n " + soldString + ":Qty\n " + specReader[10].ToString() /*section*/ + ":Section\n " + specReader[9].ToString() /*row*/ + ":Row\n " + specReader[17].ToString() /*SaleDate*/;
-            client.Credentials = new NetworkCredential("jct", "Ma75nt7276");
-            client.Send(mail);
+            client.Credentials = new NetworkCredential("jct", "Ma75nt7276!");
+           // client.EnableSsl = true;
+            try
+            {
+                client.Send(mail);
+            }
+            catch
+            {
+                LogEntry("Mail failed", "fail");
+            }
 
 
             specSaleConnection.Close();
@@ -1116,6 +1124,9 @@ namespace SaleNotifier
                     SqlConnection connection2 = new SqlConnection(connectionString);
                     command2.Connection = connection2;
                     connection2.Open();
+                    command2.ExecuteNonQuery();
+                    command2.CommandText = "Update SpecSales Set exchange = \'" + listing.exchange.ToString() + "\' where ticket_group_id = " + ticketGroup;
+                    command2.Connection = connection2;
                     command2.ExecuteNonQuery();
                     connection2.Close();
                 }
