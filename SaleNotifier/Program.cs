@@ -78,7 +78,7 @@ namespace SaleNotifier
             specLogConnection.Close();
 
             // we will want to add a time interval qualifier to invoice date after testing is done
-            string sqlstr = "SELECT dbo.ticket_group.ticket_group_id, dbo.invoice.invoice_id, COUNT(*) AS numsold,ticket.purchase_order_id FROM dbo.invoice INNER JOIN dbo.ticket ON dbo.invoice.invoice_id = dbo.ticket.invoice_id INNER JOIN dbo.ticket_group ON dbo.ticket.ticket_group_id = dbo.ticket_group.ticket_group_id WHERE (dbo.ticket_group.internal_notes LIKE \'%Romans%\') or (dbo.ticket_group.internal_notes LIKE \'FRT-Unbroadcast%\') GROUP BY dbo.ticket_group.ticket_group_id, dbo.invoice.invoice_id,ticket.purchase_order_id";
+            string sqlstr = "SELECT dbo.ticket_group.ticket_group_id, dbo.invoice.invoice_id, COUNT(*) AS numsold,ticket.purchase_order_id FROM dbo.invoice INNER JOIN dbo.ticket ON dbo.invoice.invoice_id = dbo.ticket.invoice_id INNER JOIN dbo.ticket_group ON dbo.ticket.ticket_group_id = dbo.ticket_group.ticket_group_id WHERE (dbo.invoice.create_date > getdate()-100) and ( (dbo.ticket_group.internal_notes LIKE \'%Romans%\') or (dbo.ticket_group.internal_notes LIKE \'FRT-Unbroadcast%\')) GROUP BY dbo.ticket_group.ticket_group_id, dbo.invoice.invoice_id,ticket.purchase_order_id";
             // "SELECT invoice.isautoprocessed, invoice.client_broker_id_for_mercury_buyer , invoice.generated_by_pos_api , ticket_group.ticket_group_id, invoice.create_date, invoice.user_office_id, invoice.invoice_id FROM invoice INNER JOIN ticket ON invoice.invoice_id = ticket.invoice_id INNER JOIN ticket_group ON ticket.ticket_group_id = ticket_group.ticket_group_id WHERE(ticket_group.internal_notes LIKE \'%Romans%\')";
 
             //sandbox - frt-vivdsql
@@ -124,7 +124,7 @@ namespace SaleNotifier
                     {
                         GetPOSTResponse(endpoint, requeststr);
                     }
-
+                    
                     if (statusflag) {
 
                         //unbroadcast listing to avoid double sale if void process doesn't execute properly (or we have a customer order)
@@ -573,38 +573,41 @@ namespace SaleNotifier
                             }
                             clientReader.Close();
                             //need to figure out what to do it client is not found
-
-                            SqlParameter rc = new SqlParameter();
-                            rc.ParameterName = "@RC";
-                            rc.Value = "";
-                            custCommand.Parameters.Add(rc);
-
-                            //  float subtotal = float.Parse(invtot) - float.Parse(expense) - float.Parse(ship);
-
-                            custstring = "EXECUTE @RC = [dbo].[pos_AddCredit_InvoiceCredit]" + invtot + ", \'\'  ,4  ," + clientID + ",-1  ," + invString + ",-1 ";
-                            custCommand.CommandText = custstring;
-                            if (custCommand.ExecuteNonQuery() == 0)
+                            if (clientID.Length > 0)
                             {
-                                LogEntry("Credit Not Created for Client:" + clientID, "fail");
+                                SqlParameter rc = new SqlParameter();
+                                rc.ParameterName = "@RC";
+                                rc.Value = "";
+                                custCommand.Parameters.Add(rc);
+
+                                //  float subtotal = float.Parse(invtot) - float.Parse(expense) - float.Parse(ship);
+
+                                custstring = "EXECUTE @RC = [dbo].[pos_AddCredit_InvoiceCredit]" + invtot + ", \'\'  ,4  ," + clientID + ",-1  ," + invString + ",-1 ";
+                                custCommand.CommandText = custstring;
+                                if (custCommand.ExecuteNonQuery() == 0)
+                                {
+                                    LogEntry("Credit Not Created for Client:" + clientID, "fail");
+                                }
+
+                                string creditid = rc.Value.ToString();
                             }
-
-                            string creditid = rc.Value.ToString();
-
-                            // we need to get this invoice number
+                                // we need to get this invoice number
                             SellCatListing(catTgid);
                             string invnum = catInvString;
                             custCommand.CommandText = "Update invoice set  ticket_request_id = " + trid + " where invoice_id = " + catInvString;
                             custCommand.ExecuteNonQuery();
+                            if (clientID.Length > 0)
+                            {
+                                string paystring = "Execute [dbo].[invoice_payment_insert]  2," + invnum + ",NULL  ,17 ," + invtot + ",\'n/a\'  ,\'n/a\'  ,\'n/a\'  ,NULL  ,NULL  ,12  ,1 ,1  , \'" + DateTime.Now + "\'";
 
-                            string paystring = "Execute [dbo].[invoice_payment_insert]  2," + invnum + ",NULL  ,17 ," + invtot + ",\'n/a\'  ,\'n/a\'  ,\'n/a\'  ,NULL  ,NULL  ,12  ,1 ,1  , \'" + DateTime.Now + "\'";
+                                custCommand.CommandText = paystring;
+                                custCommand.ExecuteNonQuery();
 
-                            custCommand.CommandText = paystring;
-                            custCommand.ExecuteNonQuery();
-
-                            custstring = "update invoice_credit  set available_for_use = 0,system_user_id =12 where invoice_id =" + invnum;
-                            custCommand.CommandText = custstring;
-                            custCommand.ExecuteNonQuery();
-
+                                custstring = "update invoice_credit  set available_for_use = 0,system_user_id =12 where invoice_id =" + invnum;
+                                custCommand.CommandText = custstring;
+                                custCommand.ExecuteNonQuery();
+                            }
+                            
                             /* custCommand.CommandText = "Select invoice_id from invoice where ticket_request_id = " + trid;
                              SqlDataReader invreader = custCommand.ExecuteReader();
                              invreader.Read();
@@ -670,6 +673,8 @@ namespace SaleNotifier
         public static void SellCatListing(string catListStr, bool merc = false)
         {
             bool client = false;
+            bool fulfillment = false;
+            int shippingid = 0;
 
             //========================old get tickets location=============================
             string connectionString = ConfigurationManager.ConnectionStrings["indux"].ConnectionString;
@@ -680,7 +685,7 @@ namespace SaleNotifier
 
 
 
-            string orderString = "Select [external_po_number],[client_broker_id] from dbo.purchase_Order where purchase_order_id = " + poidString;
+            string orderString = "Select [external_po_number],[client_broker_id],[shipping_tracking_id] from dbo.purchase_Order where purchase_order_id = " + poidString;
             SqlCommand ordCommand = new SqlCommand();
             ordCommand.Connection = connection;
             ordCommand.CommandText = orderString;
@@ -696,6 +701,7 @@ namespace SaleNotifier
             {
                 ordreader.Read();
                 extpo = ordreader[0].ToString();
+                shippingid = Int32.Parse(ordreader[2].ToString());
 
             }
             connection.Close();
@@ -714,6 +720,7 @@ namespace SaleNotifier
 
                 //get broker address 
                 brokerNum = Int32.Parse(ordreader[1].ToString());
+                if (brokerNum == 471) { fulfillment = true; } 
                 string brokerString = "Select main_address_id from dbo.client_broker where client_broker_id = " + brokerNum;
                 SqlCommand brokerCommand = new SqlCommand();
                 SqlConnection brokerCon = new SqlConnection(connectionString);
@@ -811,11 +818,11 @@ namespace SaleNotifier
 
 
             //==========================================
-            string invstr;
+            string invstr="";
             string expense = "0";
             string ship = "0";
             string tax = "0";
-            if (client) // put brokernum in param client_id rather than client_broker_id
+            if ((client) || (fulfillment))  // put brokernum in param client_id rather than client_broker_id
             {
 
                 //get expenses from consign invoice to place in cat invoice
@@ -833,8 +840,14 @@ namespace SaleNotifier
                 tax = invReader[2].ToString();
 
 
-
-                invstr = "execute [dbo].[api_invoice_create] " + "\'\'" + ",NULL,22,null,4,null," + brokerNum + ",null," + addressid + "," + expense + "," + ship + "," + tax + ",4," + "\'" + invNotes + "\',\'\',\'" + extpoString + "\',5,1,1,\'\',@realtix,@tix,1,0,0,0";
+                if (client)
+                {
+                    invstr = "execute [dbo].[api_invoice_create] " + "\'\'" + ",NULL,22,null,4,null," + brokerNum + ",null," + addressid + "," + expense + "," + ship + "," + tax + ",4," + "\'" + invNotes + "\',\'\',\'" + extpoString + "\',5,1,1,\'\',@realtix,@tix,1,0,0,0";
+                }
+                if (fulfillment)
+                {
+                    invstr = "execute [dbo].[api_invoice_create] " + "\'\'" + ",NULL,22,null,4,null,null," + brokerNum + "," + addressid + ",0,0,0,4," + "\'" + invNotes + "\',\'\',\'" + extpoString + "\',5,1,1,\'\',@realtix,@tix,1,0,0,0";
+                }
             }
             else {
                 invstr = "execute [dbo].[api_invoice_create] " + "\'\'" + ",NULL,22,null,4,null,null," + brokerNum + "," + addressid + ",0,0,0,4," + "\'" + invNotes + "\',\'\',\'" + extpoString + "\',5,1,1,\'\',@realtix,@tix,1,0,0,0";
@@ -852,7 +865,7 @@ namespace SaleNotifier
             {
                 string ticketprice = priceString;
 
-                if (client)
+                if ((client) ||(fulfillment))
                 {
                     // remove expenses from the unit ticket price so we can add them back on the invoice
                     int qtytix = Int32.Parse(soldString);
@@ -897,7 +910,7 @@ namespace SaleNotifier
 
             string i = "";
             //new section - we need inv # returned to customer order so we can disburse credit
-            if (client)
+            if ((client)||(fulfillment))
             {
                 string retval;
                 SqlDataReader invReader = invInsert.ExecuteReader();
@@ -944,6 +957,45 @@ namespace SaleNotifier
 
         public static Boolean checkTransactionType(int TGID)
         {
+            //=====================update for Fulfillment================================
+            string connectionString1 = ConfigurationManager.ConnectionStrings["indux"].ConnectionString;
+
+            SqlConnection connection1 = new SqlConnection(connectionString1);
+            SqlCommand Command1 = new SqlCommand();
+            Command1.Connection = connection1;
+          
+            string sqlstr1 = "SELECT [invoice_id],[client_broker_id],[client_broker_employee_id] FROM [dbo].[client_broker_invoice]  where invoice_id =" + invString;
+            //sqlstr1 = sqlstr1 + TGID.ToString();
+            Command1.CommandText = sqlstr1;
+            connection1.Open();
+            SqlDataReader Reader1 = Command1.ExecuteReader();
+            // string venueName = Reader[0].ToString();
+
+            if (Reader1.HasRows)
+            {
+                Reader1.Read();
+                string brokerstr = Reader1[1].ToString();
+                if ( Reader1[1].ToString() == "471"){ //471 is TND for fulfillment
+
+
+                    connection1.Close();
+
+                    // new sql returns tnet trans types
+                    return true;
+                }
+                else
+                {
+                    connection1.Close();
+                }
+
+            }
+
+
+
+            //==============================================================================
+
+
+
             string connectionString = ConfigurationManager.ConnectionStrings["indux"].ConnectionString;
 
             SqlConnection connection = new SqlConnection(connectionString);
