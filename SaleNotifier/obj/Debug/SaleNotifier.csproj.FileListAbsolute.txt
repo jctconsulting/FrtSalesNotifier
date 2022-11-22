@@ -38,3 +38,17 @@ C:\Users\rich\Documents\Source\Repos\SalesNofifier\salesnotifier\SaleNotifier\ob
 C:\Users\rich\Documents\Source\Repos\SalesNofifier\salesnotifier\SaleNotifier\obj\Debug\SaleNotifier.csproj.CopyComplete
 C:\Users\rich\Documents\Source\Repos\SalesNofifier\salesnotifier\SaleNotifier\bin\Debug\RestSharp.dll
 C:\Users\rich\Documents\Source\Repos\SalesNofifier\salesnotifier\SaleNotifier\bin\Debug\RestSharp.xml
+C:\Users\jct\source\repos\jctconsulting\FrtSalesNotifier\SaleNotifier\bin\Debug\SaleNotifier.exe.config
+C:\Users\jct\source\repos\jctconsulting\FrtSalesNotifier\SaleNotifier\bin\Debug\SaleNotifier.exe
+C:\Users\jct\source\repos\jctconsulting\FrtSalesNotifier\SaleNotifier\bin\Debug\SaleNotifier.pdb
+C:\Users\jct\source\repos\jctconsulting\FrtSalesNotifier\SaleNotifier\bin\Debug\Newtonsoft.Json.dll
+C:\Users\jct\source\repos\jctconsulting\FrtSalesNotifier\SaleNotifier\bin\Debug\RestSharp.dll
+C:\Users\jct\source\repos\jctconsulting\FrtSalesNotifier\SaleNotifier\bin\Debug\RestSharp.xml
+C:\Users\jct\source\repos\jctconsulting\FrtSalesNotifier\SaleNotifier\obj\Debug\SaleNotifier.csproj.AssemblyReference.cache
+C:\Users\jct\source\repos\jctconsulting\FrtSalesNotifier\SaleNotifier\obj\Debug\SaleNotifier.csproj.SuggestedBindingRedirects.cache
+C:\Users\jct\source\repos\jctconsulting\FrtSalesNotifier\SaleNotifier\obj\Debug\SaleNotifier.SQLStrings.resources
+C:\Users\jct\source\repos\jctconsulting\FrtSalesNotifier\SaleNotifier\obj\Debug\SaleNotifier.csproj.GenerateResource.cache
+C:\Users\jct\source\repos\jctconsulting\FrtSalesNotifier\SaleNotifier\obj\Debug\SaleNotifier.csproj.CoreCompileInputs.cache
+C:\Users\jct\source\repos\jctconsulting\FrtSalesNotifier\SaleNotifier\obj\Debug\SaleNotifier.csproj.CopyComplete
+C:\Users\jct\source\repos\jctconsulting\FrtSalesNotifier\SaleNotifier\obj\Debug\SaleNotifier.exe
+C:\Users\jct\source\repos\jctconsulting\FrtSalesNotifier\SaleNotifier\obj\Debug\SaleNotifier.pdb

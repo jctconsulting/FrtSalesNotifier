@@ -675,6 +675,7 @@ namespace SaleNotifier
             bool client = false;
             bool fulfillment = false;
             int shippingid = 0;
+            string email = "";
 
             //========================old get tickets location=============================
             string connectionString = ConfigurationManager.ConnectionStrings["indux"].ConnectionString;
@@ -702,6 +703,19 @@ namespace SaleNotifier
                 ordreader.Read();
                 extpo = ordreader[0].ToString();
                 shippingid = Int32.Parse(ordreader[2].ToString());
+                //get email address for fufillment orders - needs to be put into shipping_tracking_Address of cat
+                String sta = $"Select [recipient_email] from shipping_tracking_address where shipping_traking_id = {shippingid}";
+                SqlCommand StaCommand = new SqlCommand();
+                StaCommand.Connection = connection; 
+                StaCommand.CommandText = sta;
+                SqlDataReader staReader = StaCommand.ExecuteReader();
+                if (staReader.HasRows)
+                {
+                    staReader.Read();
+                    email= staReader[0].ToString();
+
+                }
+                    
 
             }
             connection.Close();
@@ -847,6 +861,8 @@ namespace SaleNotifier
                 if (fulfillment)
                 {
                     invstr = "execute [dbo].[api_invoice_create] " + "\'\'" + ",NULL,22,null,4,null,null," + brokerNum + "," + addressid + ",0,0,0,4," + "\'" + invNotes + "\',\'\',\'" + extpoString + "\',5,1,1,\'\',@realtix,@tix,1,0,0,0";
+                    //need to substitute email on new shipping_tracking_address
+
                 }
             }
             else {
@@ -936,7 +952,24 @@ namespace SaleNotifier
                 updInvoice.CommandText = "Update invoice set invoice_total = " + total.ToString() + "where invoice_id = " + catInvString;
                 updInvoice.ExecuteNonQuery();
 
+                if (fulfillment)
+                {   //need to replace email address for the new invoice 
+                    String stid = "";
+                    SqlCommand GetSta = new SqlCommand($"Select shipping_tracking_id from invoice where invoice_id = {catInvString}");
+                    GetSta.Connection = connection;
+                    SqlDataReader staReader = GetSta.ExecuteReader();
+                    if (staReader.HasRows)
+                    {
+                        staReader.Read();
+                        stid = staReader[0].ToString();
+                    }
 
+                    SqlCommand updSta = new SqlCommand();
+                    updSta.Connection = connection;
+                    updSta.CommandText = $"update shipping_tracking_address set recipient_email = {email} where shipping_tracking_id = {stid}";
+                    updSta.ExecuteNonQuery();
+
+                }
             }
             else
             {
