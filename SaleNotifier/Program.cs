@@ -1154,18 +1154,20 @@ namespace SaleNotifier
             insSpecRecord.Connection = specSaleConnection;
             insSpecRecord.CommandText = specRecord;
             insSpecRecord.ExecuteNonQuery();
-
-            // send mail before speccon closes - we use specreader data
+            
+            // send mail before speccon closes - we use specreader data  
+            /* disable mail send to start - needs retest
             MailMessage mail = new MailMessage("jct@jct-tech.com", "frtspecsales@gmail.com");
             SmtpClient client = new SmtpClient();
             client.Port = 587;
             client.DeliveryMethod = SmtpDeliveryMethod.Network;
             client.UseDefaultCredentials = false;
             client.Host = "smtp.authsmtp.com";
-            mail.Subject = "Incoming  Sale";
-            mail.Body = eventString + ":Event\n " + specReader[4].ToString() + ":Eventdate\n" + venueString + ":Venue\n " + soldString + ":Qty\n " + specReader[10].ToString() /*section*/ + ":Section\n " + specReader[9].ToString() /*row*/ + ":Row\n " + specReader[17].ToString() /*SaleDate*/;
-            client.Credentials = new NetworkCredential("ac77574", "tic-lenny-room-pq");
-           // client.EnableSsl = true;
+            mail.Subject = "Incoming  Sale";*/
+          //  mail.Body = eventString + ":Event\n " + specReader[4].ToString() + ":Eventdate\n" + venueString + ":Venue\n " + soldString + ":Qty\n " + specReader[10].ToString() /*section*/ + ":Section\n " + specReader[9].ToString() /*row*/ + ":Row\n " + specReader[17].ToString() /*SaleDate*/;
+           // client.Credentials = new NetworkCredential("ac77574", "tic-lenny-room-pq");
+
+           // client.EnableSsl = true; - keep this commented was not in use
             try
             {
                 client.Send(mail);
