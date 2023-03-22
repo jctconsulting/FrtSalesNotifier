@@ -1168,6 +1168,8 @@ namespace SaleNotifier
            // client.Credentials = new NetworkCredential("ac77574", "tic-lenny-room-pq");
 
            // client.EnableSsl = true; - keep this commented was not in use
+
+            /*
             try
             {
                 client.Send(mail);
@@ -1177,7 +1179,7 @@ namespace SaleNotifier
                 LogEntry("Mail failed", "fail");
             }
 
-
+*/
             specSaleConnection.Close();
             srconnection.Close();
             GetPriceMultiplier(tgidString);
