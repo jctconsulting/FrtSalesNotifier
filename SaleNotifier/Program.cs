@@ -676,6 +676,7 @@ namespace SaleNotifier
             bool fulfillment = false;
             int shippingid = 0;
             string email = "";
+            string rname = "";
 
             //========================old get tickets location=============================
             string connectionString = ConfigurationManager.ConnectionStrings["indux"].ConnectionString;
