@@ -705,22 +705,13 @@ namespace SaleNotifier
                 extpo = ordreader[0].ToString();
                 shippingid = Int32.Parse(ordreader[2].ToString());
                 //get email address for fufillment orders - needs to be put into shipping_tracking_Address of cat
-                String sta = $"Select [recipient_email] from shipping_tracking_address where shipping_traking_id = {shippingid}";
-                SqlCommand StaCommand = new SqlCommand();
-                StaCommand.Connection = connection; 
-                StaCommand.CommandText = sta;
-                SqlDataReader staReader = StaCommand.ExecuteReader();
-                if (staReader.HasRows)
-                {
-                    staReader.Read();
-                    email= staReader[0].ToString();
+                ordreader.Close();
 
-                }
-                    
+
 
             }
             connection.Close();
-            ordreader.Close();
+
 
             string cbinvoice = "SELECT [invoice_id],[client_broker_id],[client_broker_employee_id] FROM [dbo].[client_broker_invoice]  where invoice_id =" + invString;
             ordCommand.CommandText = cbinvoice;
@@ -735,7 +726,7 @@ namespace SaleNotifier
 
                 //get broker address 
                 brokerNum = Int32.Parse(ordreader[1].ToString());
-                if (brokerNum == 471) { fulfillment = true; } 
+                if (brokerNum == 471) { fulfillment = true; }
                 string brokerString = "Select main_address_id from dbo.client_broker where client_broker_id = " + brokerNum;
                 SqlCommand brokerCommand = new SqlCommand();
                 SqlConnection brokerCon = new SqlConnection(connectionString);
@@ -833,7 +824,7 @@ namespace SaleNotifier
 
 
             //==========================================
-            string invstr="";
+            string invstr = "";
             string expense = "0";
             string ship = "0";
             string tax = "0";
@@ -841,7 +832,7 @@ namespace SaleNotifier
             {
 
                 //get expenses from consign invoice to place in cat invoice
-                string invSQL = "Select  [invoice_total_expense],[invoice_total_shipping_cost],[invoice_total_taxes] from dbo.invoice where invoice_id = " + invString;
+                string invSQL = "Select  [invoice_total_expense],[invoice_total_shipping_cost],[invoice_total_taxes],[shipping_tracking_id] from dbo.invoice where invoice_id = " + invString;
                 SqlCommand invCommand = new SqlCommand();
                 SqlConnection invCon = new SqlConnection(connectionString);
                 invCommand.Connection = invCon;
@@ -853,7 +844,21 @@ namespace SaleNotifier
                 expense = invReader[0].ToString();
                 ship = invReader[1].ToString();
                 tax = invReader[2].ToString();
+                shippingid = Int32.Parse(invReader[3].ToString());
+                invReader.Close();
 
+                String sta = $"Select [recipient_email],[recipient_name] from shipping_tracking_address where shipping_tracking_id = {shippingid}";
+                SqlCommand StaCommand = new SqlCommand();
+                StaCommand.Connection = invCon;
+                StaCommand.CommandText = sta;
+                SqlDataReader staReader = StaCommand.ExecuteReader();
+                if (staReader.HasRows)
+                {
+                    staReader.Read();
+                    email = staReader[0].ToString();
+                    rname = staReader[1].ToString();
+
+                }
 
                 if (client)
                 {
@@ -866,7 +871,8 @@ namespace SaleNotifier
 
                 }
             }
-            else {
+            else
+            {
                 invstr = "execute [dbo].[api_invoice_create] " + "\'\'" + ",NULL,22,null,4,null,null," + brokerNum + "," + addressid + ",0,0,0,4," + "\'" + invNotes + "\',\'\',\'" + extpoString + "\',5,1,1,\'\',@realtix,@tix,1,0,0,0";
             }
 
@@ -882,7 +888,7 @@ namespace SaleNotifier
             {
                 string ticketprice = priceString;
 
-                if ((client) ||(fulfillment))
+                if ((client) || (fulfillment))
                 {
                     // remove expenses from the unit ticket price so we can add them back on the invoice
                     int qtytix = Int32.Parse(soldString);
@@ -927,7 +933,7 @@ namespace SaleNotifier
 
             string i = "";
             //new section - we need inv # returned to customer order so we can disburse credit
-            if ((client)||(fulfillment))
+            if ((client) || (fulfillment))
             {
                 string retval;
                 SqlDataReader invReader = invInsert.ExecuteReader();
@@ -939,6 +945,7 @@ namespace SaleNotifier
                     invReader.Read();
                     catInvString = invReader[0].ToString();
                 }
+
                 connection.Close();
                 string expensestr = "Insert Into  [dbo].[invoice_expenses] SELECT  [expense_amt],[expense_desc] ,[expense_type_id],[account_id] ," + catInvString + ",[notes]  FROM [dbo].[invoice_expenses] where invoice_id =" + invString;
                 SqlCommand expInsert = new SqlCommand();
@@ -952,10 +959,11 @@ namespace SaleNotifier
                 updInvoice.Connection = connection;
                 updInvoice.CommandText = "Update invoice set invoice_total = " + total.ToString() + "where invoice_id = " + catInvString;
                 updInvoice.ExecuteNonQuery();
-
+                connection.Close();
                 if (fulfillment)
                 {   //need to replace email address for the new invoice 
                     String stid = "";
+                    connection.Open();
                     SqlCommand GetSta = new SqlCommand($"Select shipping_tracking_id from invoice where invoice_id = {catInvString}");
                     GetSta.Connection = connection;
                     SqlDataReader staReader = GetSta.ExecuteReader();
@@ -964,10 +972,10 @@ namespace SaleNotifier
                         staReader.Read();
                         stid = staReader[0].ToString();
                     }
-
+                    staReader.Close();
                     SqlCommand updSta = new SqlCommand();
                     updSta.Connection = connection;
-                    updSta.CommandText = $"update shipping_tracking_address set recipient_email = {email} where shipping_tracking_id = {stid}";
+                    updSta.CommandText = $"update shipping_tracking_address set recipient_email = '{email}',recipient_name='{rname}' where shipping_tracking_id = {stid}";
                     updSta.ExecuteNonQuery();
 
                 }
@@ -1153,10 +1161,10 @@ namespace SaleNotifier
             client.Port = 587;
             client.DeliveryMethod = SmtpDeliveryMethod.Network;
             client.UseDefaultCredentials = false;
-            client.Host = "10.10.25.175";
+            client.Host = "smtp.authsmtp.com";
             mail.Subject = "Incoming  Sale";
             mail.Body = eventString + ":Event\n " + specReader[4].ToString() + ":Eventdate\n" + venueString + ":Venue\n " + soldString + ":Qty\n " + specReader[10].ToString() /*section*/ + ":Section\n " + specReader[9].ToString() /*row*/ + ":Row\n " + specReader[17].ToString() /*SaleDate*/;
-            client.Credentials = new NetworkCredential("jct", "Ma75nt7276!");
+            client.Credentials = new NetworkCredential("ac77574", "tic-lenny-room-pq");
            // client.EnableSsl = true;
             try
             {
