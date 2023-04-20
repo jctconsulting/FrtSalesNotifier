@@ -862,18 +862,18 @@ namespace SaleNotifier
 
                 if (client)
                 {
-                    invstr = "execute [dbo].[api_invoice_create] " + "\'\'" + ",NULL,22,null,4,null," + brokerNum + ",null," + addressid + "," + expense + "," + ship + "," + tax + ",4," + "\'" + invNotes + "\',\'\',\'" + extpoString + "\',5,1,1,\'\',@realtix,@tix,1,0,0,0";
+                    invstr = "execute [dbo].[api_invoice_create] " + "\'\'" + ",NULL,22,null,101,null," + brokerNum + ",null," + addressid + "," + expense + "," + ship + "," + tax + ",4," + "\'" + invNotes + "\',\'\',\'" + extpoString + "\',5,1,1,\'\',@realtix,@tix,1,0";
                 }
                 if (fulfillment)
                 {
-                    invstr = "execute [dbo].[api_invoice_create] " + "\'\'" + ",NULL,22,null,4,null,null," + brokerNum + "," + addressid + ",0,0,0,4," + "\'" + invNotes + "\',\'\',\'" + extpoString + "\',5,1,1,\'\',@realtix,@tix,1,0,0,0";
+                    invstr = "execute [dbo].[api_invoice_create] " + "\'\'" + ",NULL,22,null,101,null,null," + brokerNum + "," + addressid + ",0,0,0,4," + "\'" + invNotes + "\',\'\',\'" + extpoString + "\',5,1,1,\'\',@realtix,@tix,1,0";
                     //need to substitute email on new shipping_tracking_address
 
                 }
             }
             else
             {
-                invstr = "execute [dbo].[api_invoice_create] " + "\'\'" + ",NULL,22,null,4,null,null," + brokerNum + "," + addressid + ",0,0,0,4," + "\'" + invNotes + "\',\'\',\'" + extpoString + "\',5,1,1,\'\',@realtix,@tix,1,0,0,0";
+                invstr = "execute [dbo].[api_invoice_create] " + "\'\'" + ",NULL,22,null,101,null,null," + brokerNum + "," + addressid + ",0,0,0,4," + "\'" + invNotes + "\',\'\',\'" + extpoString + "\',5,1,1,\'\',@realtix,@tix,1,0";
             }
 
 
