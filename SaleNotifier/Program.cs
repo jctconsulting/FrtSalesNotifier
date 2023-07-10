@@ -117,7 +117,7 @@ namespace SaleNotifier
 
                     // Make a REST post to Spec here - 
                     Console.WriteLine(reader[0].ToString(), reader[1].ToString());
-                    Uri endpoint = new Uri("https://spec.pokemonion.com/listings/consignment/sold");
+                    Uri endpoint = new Uri("https://spec.pokemonion.com/api/listings/consignment/sold");
                     string requeststr = "{\"ticketGroupId\":\"" + tgidString + "\" ,\"soldQuantity\":" + soldString + "}";
                     statusflag = false; //false -production
                     if (!notified)
@@ -1210,7 +1210,7 @@ namespace SaleNotifier
                 reader.Read();
                 //for each record in spec sales - set price multiplier
                 ticketGroup = reader[0].ToString();
-                RestClient client = new RestClient("https://spec.pokemonion.com/listings/consignment/tgid/");
+                RestClient client = new RestClient("https://spec.pokemonion.com/api/listings/consignment/tgid/");
                 RestRequest request = new RestRequest(ticketGroup);
                 request.AddHeader("Authorization", "Basic c3BlYzptcDJ3ODRuUU05VlNOa1BK");
                 var response = client.Execute<specListing>(request);
